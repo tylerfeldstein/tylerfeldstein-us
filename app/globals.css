@@ -8,6 +8,37 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Add custom animations for glass shimmer effect */
+@keyframes random-shimmer {
+  0%, 100% {
+    transform: translate(-30%, -20%) rotate(45deg);
+  }
+  25% {
+    transform: translate(30%, 20%) rotate(45deg);
+  }
+  50% {
+    transform: translate(10%, -30%) rotate(45deg);
+  }
+  75% {
+    transform: translate(-20%, 30%) rotate(45deg);
+  }
+}
+
+@keyframes random-shimmer-reverse {
+  0%, 100% {
+    transform: translate(30%, 20%) rotate(45deg);
+  }
+  25% {
+    transform: translate(-20%, 30%) rotate(45deg);
+  }
+  50% {
+    transform: translate(-30%, -20%) rotate(45deg);
+  }
+  75% {
+    transform: translate(10%, -30%) rotate(45deg);
+  }
+}
+
 /* Add custom container settings */
 .container {
   width: 100%;

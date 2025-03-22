@@ -27,7 +27,7 @@ const CtaSection = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
           <div>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground mb-6">
-              Cyber Security Expertise
+              AI Security & Zero Trust Architecture Expert
             </h2>
             <p className="text-foreground/80 text-base sm:text-lg mb-8 max-w-[600px] leading-relaxed">
               Senior security architect and full stack developer specializing in secure infrastructure, 

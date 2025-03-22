@@ -93,6 +93,10 @@ const mainNavItems: NavItem[] = [
     href: "#experience",
   },
   {
+    title: "Consulting",
+    href: "#consulting",
+  },
+  {
     title: "Contact",
     href: "#contact",
   },
@@ -224,9 +228,9 @@ export default function ShadcnNavbar() {
                     )}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-background text-foreground border border-border shadow-md rounded-md">
+                <DropdownMenuContent align="end" className="w-56 bg-background text-foreground shadow-md rounded-md">
                   <DropdownMenuLabel className="font-medium">My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="border-border" />
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Logout</span>
@@ -240,7 +244,7 @@ export default function ShadcnNavbar() {
                     <User className="h-4 w-4 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-background text-foreground border border-border shadow-md rounded-md">
+                <DropdownMenuContent align="end" className="w-56 bg-background text-foreground shadow-md rounded-md">
                   <DropdownMenuItem onClick={handleLogin} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
                     <LogOut className="mr-2 h-4 w-4 rotate-180" />
                     <span>Sign In</span>

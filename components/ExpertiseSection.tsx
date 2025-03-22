@@ -13,7 +13,11 @@ import {
   LockIcon,
   NetworkIcon,
   AlertCircleIcon,
-  CommandIcon
+  CommandIcon,
+  GlobeIcon,
+  BotIcon,
+  HardDriveIcon,
+  KeyIcon
 } from 'lucide-react';
 
 // Define the expertise data to be used
@@ -21,33 +25,48 @@ const expertiseItems = [
   {
     icon: <ShieldIcon className="h-10 w-10 text-primary" />,
     title: "Cloud Security Architecture",
-    description: "Designing and implementing secure cloud infrastructure on AWS, Azure, and GCP with FedRAMP-accredited solutions and compliance controls."
+    description: "Designing zero trust architecture and implementing secure cloud infrastructure on AWS, Azure, and GCP with FedRAMP-accredited solutions and compliance controls."
   },
   {
-    icon: <CodeIcon className="h-10 w-10 text-secondary" />,
-    title: "Security Automation",
-    description: "Building automated security operations and incident response capabilities using CI/CD, IaC with Terraform, and GitLab/GitHub Actions."
+    icon: <BrainIcon className="h-10 w-10 text-secondary" />,
+    title: "AI Engineering & Machine Learning",
+    description: "Building AI-driven solutions and agent workflows with machine learning expertise for enhanced threat detection, predictive analytics, and automated decision-making systems."
   },
   {
-    icon: <NetworkIcon className="h-10 w-10 text-accent" />,
-    title: "Network Security",
-    description: "Implementing secure network designs with Cisco Nexus, firewall rules, IDS/IPS, and secure VPN gateways for enterprise environments."
+    icon: <GlobeIcon className="h-10 w-10 text-accent" />,
+    title: "Full Stack Development",
+    description: "Developing modern web applications using React, Next.js, Node.js and cloud-native architectures with CI/CD pipelines, microservices, and containerization."
   },
   {
-    icon: <CloudIcon className="h-10 w-10 text-primary" />,
-    title: "DevSecOps",
-    description: "Integrating security throughout CI/CD pipelines with SAST/DAST tools, container security, and automated vulnerability management."
+    icon: <CodeIcon className="h-10 w-10 text-primary" />,
+    title: "Security Automation & DevSecOps",
+    description: "Integrating security throughout CI/CD pipelines with SAST/DAST tools, container security, and automated vulnerability management using Terraform and GitLab/GitHub Actions."
   },
   {
     icon: <AlertCircleIcon className="h-10 w-10 text-secondary" />,
-    title: "Threat Detection & Response",
-    description: "Building threat hunting infrastructure with tools like Splunk, ELK Stack, SentinelOne, and MITRE ATT&CK frameworks."
+    title: "Threat Detection & Incident Response",
+    description: "Building AI-driven threat hunting infrastructure using Splunk, ELK Stack, SentinelOne, and MITRE ATT&CK frameworks for advanced cyber defense."
   },
   {
-    icon: <CommandIcon className="h-10 w-10 text-accent" />,
-    title: "Compliance & Risk Management",
-    description: "Ensuring alignment with frameworks including NIST, ISO 27001, SOC 2, PCI-DSS, and implementing RMF controls."
+    icon: <NetworkIcon className="h-10 w-10 text-accent" />,
+    title: "Enterprise Network Security",
+    description: "Implementing secure network architectures with Cisco Nexus, firewall rules, IDS/IPS, VPN gateways, and Zscaler solutions for comprehensive protection."
   },
+  {
+    icon: <KeyIcon className="h-10 w-10 text-primary" />,
+    title: "Compliance & Risk Management",
+    description: "Ensuring alignment with frameworks including NIST, ISO 27001, SOC 2, PCI-DSS, CCPA, and implementing RMF controls with automated compliance monitoring."
+  },
+  {
+    icon: <HardDriveIcon className="h-10 w-10 text-secondary" />,
+    title: "Infrastructure Optimization",
+    description: "Designing and managing high-performance private clouds, virtualization environments with VMware, and enterprise-grade datacenter architecture."
+  },
+  {
+    icon: <BotIcon className="h-10 w-10 text-accent" />,
+    title: "Secure AI Integration & Alignment",
+    description: "Implementing responsible AI principles with secure guardrails, ensuring data privacy, ethical AI deployment, and integration of large language models into enterprise security frameworks."
+  }
 ];
 
 const ExpertiseSection = () => {
@@ -56,12 +75,13 @@ const ExpertiseSection = () => {
       <div className="container px-4 md:px-6 mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tighter mb-2 text-foreground">
-            My Expertise
+            My Expertise as an AI Engineer & Cybersecurity Architect
           </h2>
-          <p className="max-w-[700px] mx-auto text-foreground/80">
-            With over 10 years of experience in cybersecurity, I specialize in 
-            architecting secure cloud infrastructure and implementing robust security automation
-            to protect critical systems and data.
+          <p className="max-w-[800px] mx-auto text-foreground/80">
+            As a CISSP-certified Cybersecurity Architect and AI Engineer with over 10 years of experience, 
+            I specialize in building secure cloud infrastructure, AI-driven security solutions, and full stack 
+            applications that protect critical systems and data. My expertise spans machine learning, zero trust architecture, 
+            and automated security operations.
           </p>
         </div>
         
@@ -82,7 +102,7 @@ const ExpertiseSection = () => {
               <h3 className="text-xl font-semibold mb-2 text-foreground group-hover:text-primary transition-colors">
                 {item.title}
               </h3>
-              <p className="text-muted-foreground">
+              <p className="text-foreground/70 text-sm">
                 {item.description}
               </p>
             </div>
