@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import Image from 'next/image';
 
 const HeroSection = () => {
   const socialLinks = [
@@ -34,7 +35,7 @@ const HeroSection = () => {
   ];
 
   return (
-    <section className="relative pt-24 pb-16 overflow-hidden">
+    <section className="relative pt-24 pb-24 overflow-hidden">
       <div className="container px-4 md:px-6 mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
@@ -42,12 +43,12 @@ const HeroSection = () => {
               Tyler Feldstein
             </h1>
             <h2 className="text-2xl mb-6 text-foreground/90">
-              Full-Stack Engineer & AI Specialist
+              Senior Cyber Security Engineer & Architect
             </h2>
             <p className="text-lg mb-8 text-foreground/80 max-w-[600px]">
-              I specialize in building innovative AI-powered applications and scalable web solutions. 
-              With expertise in AI engineering, React, TypeScript, and cloud architecture, I transform 
-              complex ideas into elegant, powerful digital products.
+              I specialize in designing and implementing secure cloud infrastructure and automation. 
+              With expertise in DevSecOps, cloud security architecture, and compliance frameworks, 
+              I help organizations build and maintain resilient security postures across AWS, Azure, and GCP.
             </p>
             
             <div className="flex gap-4 mb-8">
@@ -82,19 +83,24 @@ const HeroSection = () => {
           </div>
           
           <div className="relative">
-            <div className="aspect-square rounded-full bg-gradient-to-tr from-primary/30 via-secondary/50 to-accent/40 animate-rotate-slow"></div>
+            <div className="aspect-square rounded-full bg-gradient-to-tr from-primary/80 via-secondary/80 to-accent/80 animate-rotate-slow"></div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative w-[80%] aspect-square rounded-2xl overflow-hidden border-4 border-background shadow-xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-background/10 to-background/30 z-10"></div>
-                <div className="absolute inset-0 bg-card"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-lg font-medium text-foreground/80">Profile Image</span>
-                </div>
+              <div className="relative w-[95%] aspect-square rounded-full overflow-hidden border-2 border-white/20 shadow-xl">
+                <Image 
+                  src="/photos/DSC00379.JPG"
+                  alt="Tyler Feldstein"
+                  fill
+                  className="object-cover scale-[1.02]"
+                  priority
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
+      
+      {/* Gradient fade to black at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none"></div>
     </section>
   );
 };
