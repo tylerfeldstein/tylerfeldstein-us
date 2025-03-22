@@ -1,9 +1,18 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useTheme } from 'next-themes';
 
 const HeroSection = () => {
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  
+  // Ensure we only render theme-dependent elements after mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const socialLinks = [
     {
       name: 'GitHub',
@@ -35,7 +44,7 @@ const HeroSection = () => {
   ];
 
   return (
-    <section className="relative pt-24 pb-24 overflow-hidden">
+    <section className="relative pt-24 pb-24 overflow-hidden" id="home">
       <div className="container px-4 md:px-6 mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
@@ -83,17 +92,49 @@ const HeroSection = () => {
           </div>
           
           <div className="relative">
-            <div className="aspect-square rounded-full bg-gradient-to-tr from-primary/80 via-secondary/80 to-accent/80 animate-rotate-slow"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative w-[95%] aspect-square rounded-full overflow-hidden border-2 border-white/20 shadow-xl">
-                <Image 
-                  src="/photos/DSC00379.JPG"
-                  alt="Tyler Feldstein"
-                  fill
-                  className="object-cover scale-[1.02]"
-                  priority
-                />
+            {/* Outer circular container for the gradient ring */}
+            <div className="aspect-square gradient-ring">
+              {/* Main circular gradient ring */}
+              <div className="absolute inset-[-5%] rounded-full conic-gradient-ring animate-rotate-slow" 
+                style={{ filter: 'blur(12px)', zIndex: 1 }} 
+              />
+              
+              {/* Secondary spinning gradient for more dimension */}
+              <div className="absolute inset-[-3%] rounded-full conic-gradient-ring animate-rotate-slow-reverse opacity-80" 
+                style={{ 
+                  filter: 'blur(8px)',
+                  transform: 'rotate(90deg)',
+                  zIndex: 1
+                }} 
+              />
+              
+              {/* Enhanced glow around the ring */}
+              <div className="absolute inset-[-2%] rounded-full bg-white/5" style={{ filter: 'blur(20px)', zIndex: 1 }} />
+              
+              {/* Light spots to enhance the ring effect */}
+              <div className="absolute inset-0 rounded-full overflow-hidden" style={{ zIndex: 1 }}>
+                <div className="absolute w-[80%] h-[80%] top-[-10%] right-[-10%] rounded-full bg-white/8 animate-refraction" style={{ filter: 'blur(20px)' }} />
+                <div className="absolute w-[60%] h-[60%] bottom-[-5%] left-[-5%] rounded-full bg-white/8 animate-refraction-reverse" style={{ filter: 'blur(15px)' }} />
               </div>
+              
+              {/* Photo container - positioned above the gradient ring */}
+              <div className="absolute inset-[5%] flex items-center justify-center rounded-full" style={{ zIndex: 3 }}>
+                <div className="relative w-full h-full rounded-full overflow-hidden shadow-2xl">
+                  <Image 
+                    src="/photos/DSC00379-min.JPG"
+                    alt="Tyler Feldstein"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                </div>
+              </div>
+              
+              {/* Add a subtle highlight rim to emphasize the ring underneath */}
+              <div className="absolute inset-[4%] rounded-full" style={{ 
+                boxShadow: '0 0 25px 3px rgba(255, 255, 255, 0.1), 0 0 10px 1px rgba(255, 255, 255, 0.05) inset',
+                zIndex: 2
+              }} />
             </div>
           </div>
         </div>
