@@ -34,13 +34,13 @@ const CtaSection = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div>
             <h2 className="text-3xl font-bold tracking-tighter text-foreground mb-4">
-              Let&apos;s Build Something Intelligent
+              Let&apos;s Secure Your Infrastructure
             </h2>
             <p className="text-foreground/80 mb-8 max-w-[600px]">
-              Looking for an AI engineer to bring your ideas to life? I specialize in creating
-              AI-powered applications that deliver real business value. Whether you need a custom
-              LLM solution, an intelligent analytics platform, or a sophisticated web application,
-              let's collaborate on your next project.
+              Looking for a cybersecurity expert to strengthen your organization's security posture?
+              I specialize in building secure cloud infrastructure, implementing DevSecOps practices,
+              and ensuring compliance with industry frameworks. Whether you need help with security
+              architecture, automation, or incident response planning, let's discuss your security needs.
             </p>
             <div className="space-y-4 max-w-md">
               <div className="space-y-2">
@@ -65,7 +65,7 @@ const CtaSection = () => {
                 </Label>
                 <Input
                   id="message"
-                  placeholder="Tell me about your AI or web project"
+                  placeholder="Tell me about your security challenges"
                   className="bg-background/30 border-border"
                 />
               </div>
@@ -80,9 +80,17 @@ const CtaSection = () => {
                 Contact Information
               </h3>
               <p className="text-foreground/80">
-                San Francisco, CA<br />
-                tyler.feldstein@example.com<br />
-                +1 (123) 456-7890
+                Sioux Falls, SD, USA<br />
+                
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold mb-2 text-foreground">
+                Certifications
+              </h3>
+              <p className="text-foreground/80">
+                CISSP, GCIA, CASP+, CEH, CCNA<br />
+                VCP-NV, Pentest+, Security+
               </p>
             </div>
             <div>
