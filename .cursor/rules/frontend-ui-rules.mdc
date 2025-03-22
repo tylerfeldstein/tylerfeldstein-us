@@ -1,0 +1,106 @@
+---
+description: Frontend UI Rules
+globs: 
+alwaysApply: false
+---
+# Frontend UI Rules - Theme Consistency Guidelines
+
+## Core Theme Principles
+- **Always use shadcn UI's theme variables** - never hardcode colors
+- **Use OKLCH color format** for theme variables as implemented in globals.css
+- **Maintain clear light/dark mode support** throughout all components
+- **Follow accessibility standards** with proper contrast ratios
+
+## Theme Variable Usage Guidelines
+
+### Required Theme Classes (Use these instead of hardcoded colors)
+- **Background:** `bg-background`
+- **Text/Foreground:** `text-foreground`
+- **Muted backgrounds:** `bg-muted`
+- **Secondary text:** `text-muted-foreground`
+- **Borders:** `border-border`
+- **Cards:** `bg-card`, `text-card-foreground`
+- **Popovers/Dropdowns:** `bg-popover`, `text-popover-foreground`
+- **Primary elements:** `bg-primary`, `text-primary-foreground`
+- **Secondary elements:** `bg-secondary`, `text-secondary-foreground`
+- **Accent elements:** `bg-accent`, `text-accent-foreground`
+- **Form inputs:** `bg-input`, `border-input`
+- **Focus rings:** `ring-ring`
+
+### Prohibited Practices
+- ❌ **NEVER use hardcoded colors** like `bg-gray-100`, `text-gray-900`, etc.
+- ❌ **NEVER use direct color values** like `bg-[#ffffff]`, `text-[#000000]`, etc.
+- ❌ **NEVER use HSL values directly** - use the theme variables
+
+### Best Practices
+- ✅ Use `bg-background/95` for semi-transparent backgrounds (not `bg-white/95`)
+- ✅ Use `hover:bg-muted` for hover states (not `hover:bg-gray-100`)
+- ✅ Use `border-border` for all borders (not `border-gray-200`)
+- ✅ Use `text-destructive` for error states
+- ✅ Use `backdrop-blur-sm` with semi-transparent backgrounds for glass effects
+
+## Component Architecture
+
+### Example Component with Proper Theme Variables:
+
+```tsx
+"use client";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
+
+export default function ThemeConsistentForm() {
+    const [value, setValue] = useState("");
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        // Handle form submission
+    }
+
+    return (
+        <Card className="w-full max-w-md mx-auto">
+            <CardHeader>
+                <h2 className="text-xl font-semibold text-foreground">Contact Form</h2>
+                <p className="text-sm text-muted-foreground">Reach out to our team</p>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                        <label htmlFor="email" className="text-sm font-medium text-foreground">
+                            Email
+                        </label>
+                        <Input 
+                            id="email"
+                            value={value} 
+                            onChange={(e) => setValue(e.target.value)} 
+                            type="email"
+                            placeholder="your@email.com"
+                            required
+                        />
+                    </div>
+                </form>
+            </CardContent>
+            <CardFooter className="border-t border-border pt-4">
+                <Button type="submit">Submit</Button>
+            </CardFooter>
+        </Card>
+    );
+}
+```
+
+## Dropdown/Menu Components
+- Always use `className="bg-popover"` for dropdown content
+- Use `border-border` for dropdown separators, not hardcoded color values
+- Apply `text-foreground` and `text-muted-foreground` appropriately for content
+
+## Form Elements
+- Always use theme variables for input backgrounds and borders
+- Input placeholders should use `placeholder:text-muted-foreground`
+- Form validation errors should use the `text-destructive` color
+
+## Responsive Design
+- Maintain theme consistency across all breakpoints
+- Use the same theme variables regardless of screen size
+
+By following these guidelines, we ensure a consistent visual experience across our application while supporting both light and dark modes.

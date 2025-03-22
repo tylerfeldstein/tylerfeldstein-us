@@ -1,0 +1,48 @@
+---
+description: Tech Stack
+globs: 
+alwaysApply: false
+---
+# 🛠️ Tech Stack AI Rules for Cursor AI
+
+## 📌 Overview
+This project uses **Next.js 15**, **Convex**, **Inngest**, **Tailwind CSS**, **Shadcn UI**, and **TypeScript**. AI-generated code must strictly follow our **architecture and conventions**.
+
+---
+
+## ⚡ General Coding Guidelines
+✅ **Next.js 15 with App Router**  
+✅ **Server Actions** or **Convex functions** for all backend logic  
+✅ **Convex** as the only database (No direct access)  
+✅ **Inngest** for background jobs and AI workflows  
+✅ **Tailwind CSS + Shadcn UI + HeroUI**for styling  
+✅ **TypeScript only** for all files  
+
+❌ **No API routes (`/api/*`)** unless required for external integrations  
+❌ **No direct database access** (Use Convex queries/mutations)  
+❌ **No REST/GraphQL for internal data**  
+
+---
+
+## 🤖 AI Workflow Rules (Inngest)
+- All AI and long-running tasks **must run in Inngest**.
+- Trigger Inngest jobs via **Convex events or Server Actions**.
+- Output from AI agents must be stored in Convex, linked by jobId.
+
+---
+
+## 🧠 Convex Data Handling
+- Use `useQuery` / `useMutation` for client logic.  
+- Use `v.object()` and `v.union()` for strict runtime validation.  
+- **No raw client-side fetches** to Convex endpoints.
+
+---
+
+## 🎨 UI & Styling
+- All UI must use **Shadcn components** with **Tailwind**.  
+- Custom components go in `@/components/ui/` and follow existing patterns.  
+
+---
+
+## ✅ Final Rule
+**All AI-generated code must comply with this stack. Deviation requires team approval.**

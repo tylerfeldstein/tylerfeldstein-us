@@ -1,0 +1,14 @@
+---
+description: AI Code Generation Requirements
+globs: 
+alwaysApply: false
+---
+## 🚀 AI Code Generation Requirements
+✅ **Follow project structure exactly**  
+✅ **Use TypeScript for all files**  
+✅ **All auth logic must respect NextAuth + Convex rules**  
+✅ **No API routes unless absolutely necessary**  
+✅ **Frontend should use Tailwind + ShadCN**  
+✅ **No Prisma, REST, or GraphQL queries**  
+
+**⚠️ Any AI-generated code that does not follow these rules should be flagged.**

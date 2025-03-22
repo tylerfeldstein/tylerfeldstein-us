@@ -1,0 +1,167 @@
+---
+description: Application Architecture Rules
+globs: 
+alwaysApply: false
+---
+## 🏗️ Application Architecture Rules
+
+### 📌 Overview
+
+This project is built using **Next.js 15**, **TailwindCSS**, **TypeScript**, **Shadcn UI**, **Convex Database**, and **Inngest for AI agents**. Our architecture emphasizes **real-time reactivity**, **modular design**, and **scalable AI automation**.
+
+---
+
+### 🏗️ General Architecture Guidelines
+
+✅ **Next.js 15 App Router** – Use the new App Directory and Server Components architecture
+✅ **Convex as the primary database** – Real-time, serverless, fully managed
+✅ **Inngest for all AI agent workflows** – Event-driven background jobs
+✅ **Tailwind CSS + ShadCN UI + HeroUI for styling** – Utility-first design with accessible UI components
+✅ **All business logic in Server Actions or Convex functions**
+✅ **Folder names like `(auth)` are for grouping, not routes**
+
+❌ **No REST API routes unless absolutely necessary**
+❌ **No direct database access** – All data interactions must go through Convex
+❌ **No client-side data fetching from Convex** – Use `useQuery` or Server Functions
+❌ **No Redux or third-party state libraries** – Use native React or Convex
+
+---
+
+### ⚠️ Next.js 15 Dynamic Route Parameters
+
+✅ **Dynamic route params are Promises** – `params` must be awaited
+✅ **Always type params as `Promise<{ id: string }>`**
+✅ **Destructure `params` after `await`** for correct access
+
+Example:
+```tsx
+// Correct pattern for layout or page
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  // ...use id
+}
+```
+
+❌ **Never access `params.id` directly** without awaiting
+❌ **Don’t spread `params` directly** (e.g., `{...params}`)
+
+---
+
+### 🧠 AI Agents with Inngest
+
+✅ **Use Inngest for background workflows and AI processing**
+✅ **Events should be lightweight triggers only**
+✅ **Long-running AI actions (e.g., OpenAI, OCR) must run in Inngest jobs**
+✅ **Job output must be written back to Convex** with jobId traceability
+
+Example:
+```ts
+export const processDocket = inngest.createFunction(
+  { id: "process-docket" },
+  { event: "docket/created" },
+  async ({ event, step }) => {
+    const pdf = await step.run("download-pdf", async () => fetchPDF(event.data.url));
+    const parsed = await step.run("run-ocr", () => runOCR(pdf));
+    await db.insert("case_analysis", { ...parsed, jobId: event.id });
+  }
+);
+```
+
+---
+
+### 🔄 Data Access & Fetching with Convex
+
+✅ **Use `useQuery(api.table.function)` for real-time queries**
+✅ **Use `useMutation(api.table.function)` for updates**
+✅ **Use Convex Server Functions for all backend logic**
+✅ **Don’t overfetch fields – query only what you need**
+
+Example:
+```tsx
+const communities = useQuery(api.communities.list);
+return communities?.map((c) => <div key={c._id}>{c.name}</div>);
+```
+
+---
+
+### 🎨 Styling & UI
+
+✅ **Tailwind CSS for layout and spacing**
+✅ **Shadcn UI for base components** (e.g., buttons, modals, toggles)
+✅ **Responsive-first with mobile defaults**
+✅ **Use `@/components/ui/` for custom or overridden Shadcn components**
+
+❌ **Do not override global styles unless absolutely needed**
+❌ **Avoid CSS-in-JS unless scoped to a single component**
+
+---
+
+### 🧪 TypeScript & Developer Experience
+
+✅ **All files are `.tsx` or `.ts` – no JavaScript**
+✅ **Types must be inferred or explicitly declared**
+✅ **Use `zod` or Convex `v` validators for runtime validation**
+✅ **Enable strict mode in `tsconfig.json`**
+
+---
+
+### 📊 Data Modeling with Convex
+
+✅ **Each record should include creation timestamps**
+✅ **Use `v.union` and `v.literal` for enums and roles**
+✅ **Model ownership with `v.id()` references**
+
+Example:
+```ts
+export default defineSchema({
+  users: defineTable({
+    name: v.string(),
+    email: v.optional(v.string()),
+    role: v.union(v.literal("USER"), v.literal("ADMIN")),
+  }).index("by_email", ["email"]),
+});
+```
+
+---
+
+### 🔐 Authentication & Authorization
+
+✅ **Use your preferred auth provider (e.g., Clerk, Auth.js)**
+✅ **Store user identity and roles in Convex**
+✅ **Protect server functions with role checks**
+
+Example:
+```ts
+export const protectedQuery = query({
+  args: {},
+  handler: async (ctx) => {
+    if (ctx.user?.role !== "ADMIN") throw new Error("Unauthorized");
+    // ...
+  },
+});
+```
+
+---
+
+### 📈 Performance & Monitoring
+
+✅ **Lazy load heavy components**
+✅ **Use `next/image` for optimized media**
+✅ **Track execution time in AI jobs and Convex functions**
+✅ **Add error logging to Sentry or similar**
+
+---
+
+### 🛡️ Security Practices
+
+✅ **Validate all input with Zod or Convex `v`**
+✅ **Restrict data access via Convex ACLs**
+✅ **Limit AI job scopes with clear purpose and access**
+✅ **All sensitive tokens must be in env vars**
+
+---
+
+### ✅ Final Rule: All new features must adhere to these rules and be reviewed for architecture alignment before merging.
+
+---
+

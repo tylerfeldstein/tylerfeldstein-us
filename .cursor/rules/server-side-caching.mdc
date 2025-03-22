@@ -1,0 +1,227 @@
+---
+description: Coding Rules
+globs: 
+alwaysApply: false
+---
+# Server-Side Caching Implementation
+
+This document explains how server-side caching is implemented for the Features section and other content that should be cached for all users.
+
+## Overview
+
+The caching implementation uses Next.js's built-in caching mechanisms combined with React's `cache` function and server actions. This approach ensures:
+
+1. Data is cached for all users
+2. The database is only queried when necessary
+3. Cache can be invalidated when content changes
+4. Fallback data is provided in case of errors
+
+## Implementation Details
+
+### 1. Server Action with React Cache
+
+The core of the implementation is in `lib/features-actions.ts`:
+
+```typescript
+// Cache the data fetching function with React's cache
+export const getFeaturesData = cache(async () => {
+  // Fetch and process data...
+});
+```
+
+This uses React's `cache` function to memoize the result of the data fetching function. The cache is shared across all users of the application.
+
+### 2. Time-Based Cache Invalidation
+
+A time-based cache invalidation mechanism is implemented as a fallback:
+
+```typescript
+// Store the last time the data was fetched
+let lastFetchTime = 0;
+const CACHE_TTL = 3600000; // 1 hour in milliseconds
+
+// Check if we need to refresh the cache based on time
+if (now - lastFetchTime > CACHE_TTL) {
+  lastFetchTime = now;
+}
+```
+
+### 3. Manual Cache Revalidation
+
+Administrators can manually revalidate the cache using the `RevalidateFeatures` component:
+
+```typescript
+// Server action to revalidate the features cache
+export async function revalidateFeaturesCache() {
+  // Force update the lastFetchTime to trigger a refresh
+  lastFetchTime = 0;
+  
+  // Revalidate the home page where features are displayed
+  revalidatePath('/');
+  
+  return { success: true, message: 'Features cache revalidated successfully' };
+}
+```
+
+### 4. Convex Integration with Webhook
+
+The implementation includes a Convex mutation that triggers a webhook to the Next.js application for cache revalidation:
+
+```typescript
+export const invalidateCache = mutation({
+  args: {
+    section: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    try {
+      // Record the invalidation in the database
+      await ctx.db.insert("cacheInvalidations", {
+        section: args.section,
+        timestamp: Date.now(),
+      });
+      
+      // Get the deployment URL from environment variables
+      const deploymentUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
+      
+      if (deploymentUrl) {
+        // Construct the revalidation webhook URL
+        const revalidationUrl = `${deploymentUrl}/api/revalidate`;
+        
+        // Create a secret token for security
+        const revalidationToken = process.env.REVALIDATION_SECRET || "default-secret-token";
+        
+        // Make the request to the revalidation endpoint
+        const response = await fetch(revalidationUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${revalidationToken}`
+          },
+          body: JSON.stringify({
+            section: args.section,
+            paths: ["/"] // Revalidate the home page where features are displayed
+          })
+        });
+        
+        if (!response.ok) {
+          console.error("Failed to revalidate cache via webhook");
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error invalidating cache:", error);
+      return false;
+    }
+  },
+});
+```
+
+### 5. Revalidation API Endpoint
+
+A secure API endpoint handles the revalidation requests from Convex:
+
+```typescript
+// app/api/revalidate/route.ts
+export async function POST(request: NextRequest) {
+  try {
+    // Verify the authorization token
+    const authHeader = request.headers.get('authorization');
+    const expectedToken = `Bearer ${process.env.REVALIDATION_SECRET || 'default-secret-token'}`;
+    
+    if (authHeader !== expectedToken) {
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    
+    // Parse the request body
+    const body = await request.json();
+    const { section, paths } = body;
+    
+    // Revalidate each path
+    for (const path of paths) {
+      revalidatePath(path);
+    }
+    
+    return NextResponse.json({
+      revalidated: true,
+      section,
+      paths
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { revalidated: false, message: 'Failed to revalidate paths' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+## Environment Variables
+
+The following environment variables are used for the revalidation process:
+
+- `NEXT_PUBLIC_APP_URL`: The URL of your Next.js application
+- `VERCEL_URL`: Automatically set by Vercel in production
+- `REVALIDATION_SECRET`: A secret token to secure the revalidation endpoint
+
+## Usage
+
+### In Server Components
+
+```typescript
+import { getFeaturesData } from "@/lib/features-actions";
+
+export default async function MyServerComponent() {
+  const { header, featuresByCategory } = await getFeaturesData();
+  
+  // Use the data...
+}
+```
+
+### Triggering Cache Revalidation
+
+In the admin UI:
+
+```typescript
+import { RevalidateFeatures } from "@/components/admin/RevalidateFeatures";
+
+export default function AdminPage() {
+  return (
+    <div>
+      <h1>Content Management</h1>
+      <RevalidateFeatures />
+    </div>
+  );
+}
+```
+
+## Revalidation Flow
+
+1. Admin clicks "Revalidate Features Cache" button
+2. Client calls Convex `invalidateCache` mutation
+3. Convex records the invalidation and triggers the webhook
+4. Next.js API route receives the webhook and calls `revalidatePath`
+5. Client calls the `revalidateFeaturesCache` server action
+6. Server action resets the cache and calls `revalidatePath` again (redundancy)
+7. Next.js invalidates the cache for the specified paths
+8. On the next request, fresh data is fetched from the database
+
+## Best Practices
+
+1. **Use server components** when possible to leverage the caching
+2. **Implement proper error handling** with fallback data
+3. **Add cache invalidation** when content is updated
+4. **Monitor cache performance** in production
+5. **Secure the revalidation endpoint** with a secret token
+6. **Log all revalidation events** for debugging and auditing
+
+## Future Improvements
+
+- Implement distributed caching with Redis for multi-server deployments
+- Add more granular cache invalidation for specific content sections
+- Implement stale-while-revalidate pattern for smoother user experience
+- Add automatic revalidation triggers when content is updated in the CMS 
