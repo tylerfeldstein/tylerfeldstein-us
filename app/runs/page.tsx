@@ -13,9 +13,27 @@ import { useUser } from "@clerk/nextjs";
 import { triggerHelloWorld } from "../actions/inngest";
 import { useInngestRealtime } from "@/hooks/useInngestRealtime";
 import { InngestTraceView, createTraceFromJobResult } from "@/components/InngestTraceView";
+import { Metadata } from "next";
 
 // Lazy load the InngestResultsTable component
 const InngestResultsTable = lazy(() => import("@/components/InngestResultsTable"));
+
+// Note: This metadata export won't work in a client component
+// This is left as a comment - we need to create a separate layout.tsx for this route
+/*
+export const metadata: Metadata = {
+  title: "AI Projects | Tyler Feldstein - AI Engineer & Cybersecurity Architect",
+  description: "Explore AI security projects demonstrating machine learning for threat detection, cloud security automation, and zero trust architecture implementations.",
+  openGraph: {
+    title: "AI Projects | Tyler Feldstein - AI Engineer & Cybersecurity Architect",
+    description: "Explore AI security projects demonstrating machine learning for threat detection, cloud security automation, and zero trust architecture implementations.",
+  },
+  twitter: {
+    title: "AI Projects | Tyler Feldstein - AI Engineer & Cybersecurity Architect",
+    description: "Explore AI security projects demonstrating machine learning for threat detection, cloud security automation, and zero trust architecture implementations.",
+  }
+};
+*/
 
 export default function Home() {
   return (

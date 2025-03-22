@@ -37,11 +37,11 @@ const ProjectsSection = () => {
       <div className="container px-4 md:px-6 mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tighter mb-2 text-foreground">
-            Featured Projects
+            AI Security & Cloud Architecture Projects
           </h2>
           <p className="max-w-[700px] mx-auto text-foreground/80">
-            A selection of my enterprise security projects that demonstrate 
-            my expertise in building secure, compliant, and resilient infrastructure for major organizations.
+            A selection of my enterprise AI security and cloud architecture projects that demonstrate 
+            my expertise in building secure, compliant, and resilient infrastructure using zero trust principles and machine learning for threat detection.
           </p>
         </div>
         
@@ -64,7 +64,7 @@ const ProjectsSection = () => {
                 <h3 className="text-xl font-semibold mb-2 text-foreground group-hover:text-primary transition-colors">
                   {project.title}
                 </h3>
-                <p className="mb-4 text-muted-foreground">
+                <p className="text-foreground/70 text-sm mb-4">
                   {project.description}
                 </p>
                 

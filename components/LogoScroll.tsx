@@ -112,7 +112,7 @@ const LogoScroll = () => {
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
           <Image 
             src="/companies/everbridge.png" 
-            alt="Everbridge" 
+            alt="Everbridge - Company where Tyler Feldstein applied AI security expertise" 
             width={180} 
             height={72} 
             className="object-contain h-18 filter hover:drop-shadow-md" 
@@ -126,7 +126,7 @@ const LogoScroll = () => {
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
           <Image 
             src="/companies/Warner_Bros._Discovery.png" 
-            alt="Warner Bros. Discovery" 
+            alt="Warner Bros. Discovery - Where Tyler Feldstein worked as a Cybersecurity Architect" 
             width={180} 
             height={72} 
             className="object-contain h-18 filter hover:drop-shadow-md" 
@@ -140,7 +140,7 @@ const LogoScroll = () => {
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
           <Image 
             src="/companies/caci.svg" 
-            alt="CACI" 
+            alt="CACI - Where Tyler Feldstein implemented AI security solutions" 
             width={180} 
             height={72} 
             className="object-contain h-18 filter hover:drop-shadow-md" 
@@ -154,7 +154,7 @@ const LogoScroll = () => {
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
           <Image 
             src="/companies/tmobile.svg" 
-            alt="T-Mobile" 
+            alt="T-Mobile - Where Tyler Feldstein developed cloud security architecture" 
             width={180} 
             height={72} 
             className="object-contain h-18 filter hover:drop-shadow-md" 

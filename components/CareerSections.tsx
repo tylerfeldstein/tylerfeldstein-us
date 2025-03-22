@@ -73,15 +73,15 @@ const CareerSections = () => {
           transition={{ duration: 0.5 }}
           className="text-3xl md:text-5xl font-bold tracking-tight text-foreground text-center mb-6"
         >
-          My Career Journey
+          AI Engineer & Cybersecurity Career Journey
         </motion.h2>
         <motion.p 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-lg md:text-xl text-muted-foreground text-center max-w-3xl mx-auto"
+          className="text-lg md:text-xl text-foreground/80 text-center max-w-3xl mx-auto"
         >
-          A chronological overview of my professional experience
+          Professional experience in cloud security architecture, AI-driven threat detection, and zero trust implementations across leading enterprises
         </motion.p>
       </div>
       
