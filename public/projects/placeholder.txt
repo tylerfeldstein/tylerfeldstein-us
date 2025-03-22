@@ -1,0 +1,6 @@
+Place your project images in this folder with the following names:
+- ecommerce.jpg - For the E-commerce Platform project
+- ai-assistant.jpg - For the AI Content Assistant project
+- task-app.jpg - For the Task Management App project
+
+Images should be around 800x600px for optimal display in the project cards. 

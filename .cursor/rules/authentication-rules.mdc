@@ -1,0 +1,119 @@
+---
+description: Authentication
+globs: 
+alwaysApply: false
+---
+ # Authentication Rules
+
+This application supports dual authentication systems: Clerk and NextAuth.js. Both systems are fully integrated with Convex backend for user management and storage.
+
+## Authentication Providers
+
+### Clerk Authentication
+- Primary authentication provider for legacy users
+- Provides secure user management with JWT tokens
+- Users are identified in Convex by their `clerkId`
+
+### NextAuth.js Authentication
+- Newer authentication system supporting multiple OAuth providers (GitHub, Google)
+- JWT-based authentication with server-side sessions
+- Users are identified in Convex by a combination of identifiers
+
+## User Identification
+
+The application uses a robust multi-identifier approach to reliably identify users across authentication methods:
+
+### Primary Identifiers
+- `authProviderId`: String in format `nextauth:{userId}` or `clerk:{userId}`
+- Provider-specific identifiers:
+  - `clerkId`: For users authenticated with Clerk
+  - `githubId`: GitHub OAuth provider account ID
+  - `googleId`: Google OAuth provider account ID
+  - `microsoftId`: Microsoft OAuth provider account ID
+
+### User Lookup Flow
+1. First attempt to find user by `authProviderId`
+2. If not found, try provider-specific IDs (`githubId`, `googleId`, etc.)
+3. This approach ensures users are found even if their session details change
+
+## Authentication Helpers
+
+### Key Helper Functions
+
+```typescript
+// Get all available identifiers for the current user
+export async function getAuthIdentifiers(): Promise<{
+  authProviderId: string;
+  githubId?: string;
+  googleId?: string;
+  microsoftId?: string;
+} | null>
+
+// Legacy function for backward compatibility
+export async function getAuthProviderId(): Promise<string | null>
+
+// Get the current authentication provider type
+export async function getAuthProvider(): Promise<"nextauth" | "clerk" | null>
+```
+
+### Convex Query Functions
+
+```typescript
+// Find a user by any combination of identifiers
+export const getUserByAuth = query({
+  args: {
+    authProviderId: v.optional(v.string()),
+    githubId: v.optional(v.string()),
+    googleId: v.optional(v.string()),
+    microsoftId: v.optional(v.string()),
+  },
+  /* ... implementation ... */
+})
+```
+
+## Authentication Flow
+
+1. User signs in through either Clerk UI or NextAuth providers (GitHub, Google)
+2. Auth provider generates JWT token and session
+3. Server actions use `getAuthIdentifiers()` to get all possible identifiers
+4. Convex backend uses `getUserByAuth` to find user by any available identifier
+5. Actions proceed with the retrieved user ID
+
+## User Creation and Synchronization
+
+When a user signs in:
+
+1. `auth.ts` JWT callback captures provider-specific IDs
+2. NextAuth `signIn` callback calls `updateUser` mutation with all identifiers
+3. Convex `updateUser` mutation:
+   - Checks for existing user with any identifier
+   - Updates existing user or creates new one with all available identifiers
+   - Maintains backward compatibility with older auth methods
+
+## Best Practices
+
+1. **Always use robust lookup**: Use `getAuthIdentifiers()` instead of just `getAuthProviderId()`
+2. **Server actions**: Pass all identifiers to Convex queries and mutations
+3. **Error handling**: Include fallback options if a user cannot be found
+4. **Tokens**: Store provider-specific IDs in JWT tokens and session objects
+
+## Common Issues and Solutions
+
+1. **User not found**: 
+   - Check for mismatched identifiers
+   - Ensure OAuth callback correctly stores provider account IDs
+   - Verify user exists in Convex database
+
+2. **Missing parameters error**:
+   - Ensure server actions are using `getAuthIdentifiers()`
+   - Update Convex functions to use multi-identifier approach
+
+3. **Provider-specific issues**:
+   - GitHub: Verify callback URLs match GitHub OAuth settings
+   - Google: Check authorized JavaScript origins
+   - Clerk: Ensure webhook endpoints are properly configured
+
+4. **JWT token issues**:
+   - Check NEXTAUTH_SECRET is set correctly
+   - Verify session expiration settings
+   - Clear browser storage if necessary
