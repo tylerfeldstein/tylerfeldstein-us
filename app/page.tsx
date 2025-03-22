@@ -11,7 +11,7 @@ export default function Home() {
   return (
     <main className="overflow-hidden w-full main-gradient">
       {/* Hero section with counter gradient */}
-      <div className="w-full relative z-10">
+      <div id="home" className="w-full relative z-10">
         <PageSection className="relative z-10">
           <HeroSection />
         </PageSection>
@@ -23,28 +23,28 @@ export default function Home() {
       </div>
       
       {/* Expertise section with counter gradient */}
-      <div className="w-full relative z-20 mt-[-2vw]">
+      <div id="about" className="w-full relative z-20 mt-[-2vw]">
         <PageSection className="relative z-10 pt-[calc(2vw+4rem)]">
           <ExpertiseSection />
         </PageSection>
       </div>
       
       {/* Projects section with counter gradient */}
-      <div className="w-full relative z-30 mt-[-2vw]">
+      <div id="skills" className="w-full relative z-30 mt-[-2vw]">
         <PageSection className="relative z-10 pt-[calc(2vw+4rem)]">
           <ProjectsSection />
         </PageSection>
       </div>
       
       {/* Career Sections component with Apple-style scrolling */}
-      <div className="w-full relative z-35 mt-[-2vw]">
+      <div id="experience" className="w-full relative z-35 mt-[-2vw]">
         <PageSection className="relative z-10 pt-[calc(2vw+4rem)]">
           <CareerSections />
         </PageSection>
       </div>
       
       {/* CTA section with counter gradient */}
-      <div className="w-full relative z-40">
+      <div id="contact" className="w-full relative z-40">
         <PageSection className="relative z-10">
           <CtaSection />
         </PageSection>
