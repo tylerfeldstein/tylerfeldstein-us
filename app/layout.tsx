@@ -6,6 +6,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import ShadcnNavbar from "@/components/ShadcnNavbar";
+import SmoothScrolling from "@/components/SmoothScrolling";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,9 +47,11 @@ export default function RootLayout({
           <ClerkProvider>
             <ConvexClientProvider>
               <ShadcnNavbar/>
-              <div className="pt-16 w-full flex flex-col items-center justify-center overflow-x-hidden">
-                {children}
-              </div>
+              <SmoothScrolling>
+                <div className="pt-16 w-full flex flex-col items-center justify-center overflow-x-hidden">
+                  {children}
+                </div>
+              </SmoothScrolling>
               <Toaster />
             </ConvexClientProvider>
           </ClerkProvider>
