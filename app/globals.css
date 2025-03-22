@@ -2,6 +2,7 @@
 @tailwind utilities;
 
 @import "./styles/gradients.css";
+@import "./styles/glass.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 
