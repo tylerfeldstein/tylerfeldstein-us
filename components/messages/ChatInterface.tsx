@@ -39,7 +39,7 @@ export function ChatInterface() {
     api.messages.getChat, 
     selectedChatId ? { chatId: selectedChatId } : "skip"
   );
-
+  
   // Check if the selected chat has been deleted
   useEffect(() => {
     if (selectedChatId && selectedChat === null) {
@@ -117,18 +117,27 @@ export function ChatInterface() {
   }, [chats, selectedChatId]);
   
   // Mark messages as read when user views a chat
-  const markAsRead = useMutation(api.messages.markMessagesAsRead);
+  const markAsRead = useMutation(api.secureMessages.markMessagesAsReadSecure);
   
   // Only mark messages as read when the selectedChatId changes
   useEffect(() => {
     if (selectedChatId && user && selectedChatId !== previousChatIdRef.current) {
-      markAsRead({ chatId: selectedChatId });
+      markAsRead({ 
+        chatId: selectedChatId,
+        tokenPayload: {
+          userId: user.id,
+          userRole: "user", // This will be overridden by server-side check
+          exp: 0, // These will be filled by server
+          iat: 0,
+          jti: "" // This will be filled by server
+        }
+      });
       previousChatIdRef.current = selectedChatId;
     }
   }, [selectedChatId, user, markAsRead]);
   
   // Create a chat directly for regular users or show modal for admins
-  const createChat = useMutation(api.messages.createChat);
+  const createChat = useMutation(api.secureMessages.createChatSecure);
   
   const handleNewChat = async () => {
     // For admin users, show the modal to select participants
@@ -141,17 +150,32 @@ export function ChatInterface() {
     if (!user) return;
     
     try {
-      const newChatId = await createChat({
+      const result = await createChat({
         name: "New Chat",
         initialMessage: "Hello! How can I help you today?",
         participantIds: [], // Add empty array for participantIds
+        tokenPayload: {
+          userId: user.id,
+          userRole: "user", // This will be overridden by server-side check
+          exp: 0, // These will be filled by server
+          iat: 0,
+          jti: "" // This will be filled by server
+        }
       });
       
-      setSelectedChatId(newChatId);
+      if (result.error) {
+        console.error("Failed to create chat:", result.error);
+        alert("Failed to create chat. Please try again.");
+        return;
+      }
       
-      // On mobile, close sidebar when creating new chat
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
+      if (result.chatId) {
+        setSelectedChatId(result.chatId);
+        
+        // On mobile, close sidebar when creating new chat
+        if (window.innerWidth < 768) {
+          setIsSidebarOpen(false);
+        }
       }
     } catch (error) {
       console.error("Failed to create chat:", error);
@@ -290,11 +314,12 @@ export function ChatInterface() {
         {/* Only render chat content if we have a selected chat and it exists in the database */}
         {selectedChatId && selectedChat ? (
           <>
-            <ChatHeader 
+            <ChatHeader
               chatId={selectedChatId}
-              onClose={() => setIsSidebarOpen(true)}
-              onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-              showToggle={true}
+              chatName={selectedChat.name || "Support Chat"}
+              participantCount={selectedChat.participantIds?.length || 0}
+              onBackClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              isMobile={!isSidebarOpen}
             />
             <MessageList chatId={selectedChatId} />
             <MessageInput chatId={selectedChatId} />

@@ -12,7 +12,7 @@ This project uses **Next.js 15**, **Convex**, **Inngest**, **Tailwind CSS**, **S
 
 ## ⚡ General Coding Guidelines
 ✅ **Next.js 15 with App Router**  
-✅ **Server Actions** or **Convex functions** for all backend logic  
+✅ **Server Actions** or **Convex functions** for all backend logic located in /actions
 ✅ **Convex** as the only database (No direct access)  
 ✅ **Inngest** for background jobs and AI workflows  
 ✅ **Tailwind CSS + Shadcn UI + HeroUI**for styling  
