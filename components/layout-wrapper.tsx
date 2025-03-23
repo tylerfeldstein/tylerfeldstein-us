@@ -17,13 +17,13 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   }
   
   return (
-    <>
+    <div className="w-full min-h-screen main-gradient">
       <ShadcnNavbar />
       <SmoothScrolling>
         <div className="pt-16 w-full flex flex-col items-center justify-center overflow-x-hidden">
           {children}
         </div>
       </SmoothScrolling>
-    </>
+    </div>
   );
 } 
