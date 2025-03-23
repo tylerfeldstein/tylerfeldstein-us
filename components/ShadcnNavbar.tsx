@@ -4,15 +4,13 @@ import * as React from "react";
 import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
-import { 
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle
-} from "@/components/ui/navigation-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User, MessageSquare, Menu, ChevronDown } from "lucide-react";
 import { ModeToggle } from "@/components/ModeToggle";
 import { useState, useEffect } from "react";
 import Image from 'next/image';
@@ -76,10 +74,10 @@ const resourceItems: NavItem[] = [
 
 // Updated navigation items to match exact section components 
 const mainNavItems: NavItem[] = [
-  {
-    title: "Hero",
-    href: "#home",
-  },
+  // {
+  //   title: "Hero",
+  //   href: "#home",
+  // },
   {
     title: "Expertise",
     href: "#about",
@@ -96,10 +94,10 @@ const mainNavItems: NavItem[] = [
     title: "Consulting",
     href: "#consulting",
   },
-  {
-    title: "Contact",
-    href: "#contact",
-  },
+  // {
+  //   title: "Contact",
+  //   href: "#contact",
+  // },
 ];
 
 export default function ShadcnNavbar() {
@@ -110,7 +108,8 @@ export default function ShadcnNavbar() {
   
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("home");
-  const headerHeight = 20; // Increased from 80px to 120px for more space at the top
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const headerHeight = 20;
   
   useEffect(() => {
     const handleScroll = () => {
@@ -152,40 +151,39 @@ export default function ShadcnNavbar() {
     const sectionId = href.substring(1);
     const element = document.getElementById(sectionId);
     if (element) {
-      // Calculate the element's position relative to the document
       const rect = element.getBoundingClientRect();
       const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
       const elementTop = rect.top + scrollTop;
       
-      // Scroll to element with increased offset to position section higher on screen
       window.scrollTo({
         top: elementTop - headerHeight,
         behavior: 'smooth'
       });
       
       setActiveSection(sectionId);
+      setIsMobileMenuOpen(false);
     }
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center pointer-events-none">
+    <div className="sticky top-0 left-0 right-0 z-50 flex items-center justify-center pointer-events-none">
       <div
         className={cn(
-          "transition-all duration-300 ease-in-out pointer-events-auto",
+          "transition-all duration-300 ease-in-out pointer-events-auto w-full",
           scrolled
-            ? "bg-background/80 backdrop-blur-sm shadow-md mt-4 rounded-full border border-border w-[85%] sm:w-[480px] md:w-[580px] lg:w-[680px]"
+            ? "bg-background/80 backdrop-blur-sm shadow-md mt-4 rounded-full border border-border max-w-[85%] sm:max-w-[480px] md:max-w-[580px] lg:max-w-[680px]"
             : "w-full bg-background/90 backdrop-blur-sm border-b border-border"
         )}
       >
         <div className="flex items-center justify-between h-14 px-3 sm:px-4 md:px-6">
-          <div className="flex items-center gap-4 sm:gap-6 md:gap-8">
-            {/* Logo with simple initials */}
+          <div className="flex items-center gap-4">
+            {/* Logo */}
             <Link href="#home" className="flex items-center" onClick={(e) => handleSectionClick(e, "#home")}>
               <span className="font-bold text-xl text-foreground">T.F.</span>
             </Link>
 
-            {/* Main Navigation - Always visible */}
-            <div className="hidden sm:flex space-x-1">
+            {/* Desktop Navigation */}
+            <div className="hidden lg:flex space-x-1">
               {mainNavItems.map((item) => (
                 <Link
                   key={item.title}
@@ -202,17 +200,130 @@ export default function ShadcnNavbar() {
                 </Link>
               ))}
             </div>
+
+            {/* Tablet Navigation Dropdown */}
+            <div className="hidden md:flex lg:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger className="flex items-center gap-1 px-2 py-2 text-sm rounded-md transition-colors text-muted-foreground hover:text-foreground">
+                  <span>Navigation</span>
+                  <ChevronDown className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  {mainNavItems.map((item) => (
+                    <DropdownMenuItem key={item.title} asChild>
+                      <Link
+                        href={item.href}
+                        onClick={(e) => handleSectionClick(e, item.href)}
+                        className={cn(
+                          "w-full",
+                          activeSection === item.href.substring(1)
+                            ? "text-primary font-medium"
+                            : "text-foreground"
+                        )}
+                      >
+                        {item.title}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
-          {/* Right side - User section and dark/light mode toggle */}
+          {/* Right side - Mobile menu, Messages, User section, and dark/light mode toggle */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <ModeToggle />
+            {/* Mobile Menu Button */}
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <button className="md:hidden flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent">
+                  <Menu className="h-5 w-5" />
+                </button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-64 sm:w-80">
+                <SheetHeader>
+                  <SheetTitle>Navigation Menu</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-4 pt-6">
+                  {mainNavItems.map((item) => (
+                    <Link
+                      key={item.title}
+                      href={item.href}
+                      onClick={(e) => handleSectionClick(e, item.href)}
+                      className={cn(
+                        "px-2 py-2 text-sm rounded-md transition-colors",
+                        activeSection === item.href.substring(1)
+                          ? "text-primary font-medium" 
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {item.title}
+                    </Link>
+                  ))}
+                  
+                  {/* Message Button for Mobile */}
+                  <div className="px-2 py-2">
+                    {isSignedIn ? (
+                      <Link 
+                        href="/messages" 
+                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        <span>Messages</span>
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                          handleLogin();
+                        }}
+                        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        <span>Sign in to message me</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            {/* Messages Link - Show for all users but handle differently based on auth state */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="hidden md:flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors text-muted-foreground hover:text-foreground">
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="hidden lg:inline">Messages</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {isSignedIn ? (
+                  <DropdownMenuItem asChild>
+                    <Link href="/messages" className="w-full">
+                      Send me a message
+                    </Link>
+                  </DropdownMenuItem>
+                ) : (
+                  <>
+                    <DropdownMenuLabel>Want to get in touch?</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={handleLogin} className="cursor-pointer gap-2">
+                      <LogOut className="h-4 w-4 rotate-180" />
+                      Sign in to message me
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="hidden sm:block">
+              <ModeToggle />
+            </div>
             
-            {/* Only show login for authenticated contact form access */}
+            {/* User Menu */}
             {isSignedIn && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden outline-none">
+                  <button className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden outline-none ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
                     {user.imageUrl ? (
                       <Image 
                         src={user.imageUrl} 
@@ -231,6 +342,20 @@ export default function ShadcnNavbar() {
                 <DropdownMenuContent align="end" className="w-56 bg-background text-foreground shadow-md rounded-md">
                   <DropdownMenuLabel className="font-medium">My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  {/* Show theme toggle in dropdown for mobile */}
+                  <DropdownMenuItem className="sm:hidden focus:bg-accent focus:text-accent-foreground">
+                    <div className="flex items-center w-full">
+                      <ModeToggle />
+                      <span className="ml-2">Theme</span>
+                    </div>
+                  </DropdownMenuItem>
+                  {/* Show Messages in dropdown for mobile */}
+                  <DropdownMenuItem asChild className="md:hidden focus:bg-accent focus:text-accent-foreground">
+                    <Link href="/messages" className="flex items-center">
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      <span>Messages</span>
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Logout</span>
@@ -257,32 +382,4 @@ export default function ShadcnNavbar() {
       </div>
     </div>
   );
-}
-
-/* 
-  Kept for future dropdown menu functionality
-*/
-const ListItem = React.forwardRef<
-  React.ElementRef<"a">,
-  React.ComponentPropsWithoutRef<"a"> & { title: string }
->(({ className, title, children, ...props }, ref) => {
-  return (
-    <li>
-      <NavigationMenuLink asChild>
-        <a
-          ref={ref}
-          className={cn(
-            "block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground text-foreground font-medium",
-            className
-          )}
-          {...props}
-        >
-          <div className="text-sm font-medium leading-none mb-1">{title}</div>
-          {children}
-        </a>
-      </NavigationMenuLink>
-    </li>
-  );
-});
-
-ListItem.displayName = "ListItem"; 
+} 

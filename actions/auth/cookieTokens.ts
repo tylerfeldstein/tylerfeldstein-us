@@ -354,7 +354,7 @@ export async function invalidateJwtToken() {
 }
 
 /**
- * Force logout, invalidate token, and clear cookies
+ * Force logout and invalidate token
  */
 export async function forceLogout() {
   try {
@@ -364,15 +364,13 @@ export async function forceLogout() {
     // Clear cookies
     await clearChatJwtCookies();
     
-    // Redirect to login page
-    redirect("/sign-in", RedirectType.replace);
+    return { success: true };
   } catch (error) {
     console.error("Error during force logout:", error);
     
     // Make sure cookies are cleared even if there's an error
     await clearChatJwtCookies();
     
-    // Redirect to login page anyway
-    redirect("/sign-in", RedirectType.replace);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
   }
 }

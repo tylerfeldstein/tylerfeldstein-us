@@ -116,7 +116,7 @@ export function MessageInput({ chatId }: MessageInputProps) {
       <div className={`px-4 md:px-8 pb-6 ${
         resolvedTheme === "dark" 
           ? "bg-gradient-to-t from-black/50 via-black/20 to-transparent/20 backdrop-blur-sm" 
-          : "bg-gradient-to-t from-blue-50/80 via-blue-50/40 to-transparent backdrop-blur-sm"
+          : "bg-gradient-to-t from-blue-50/80 via-blue-50/40 to-transparent backdrop-blur-lg"
       }`}>
         <div className="max-w-3xl mx-auto">
           <form 

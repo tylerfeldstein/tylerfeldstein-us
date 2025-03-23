@@ -1,5 +1,6 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 // Define public routes that don't require authentication
 const publicRoutes = [
@@ -11,13 +12,15 @@ const publicRoutes = [
   '/robots.txt',
 ];
 
-// Create matcher for protected routes
+const isProtectedRoute = createRouteMatcher(['/messages(.*)'])
+
 const isPublicRoute = createRouteMatcher(publicRoutes);
 
-export default clerkMiddleware((auth, req) => {
+export default clerkMiddleware(async (auth, req) => {
   // Security fix for CVE-2025-29927 (GHSA-f82v-jwr5-mffw)
-  // Block requests with x-middleware-subrequest header
   const hasSubrequestHeader = req.headers.get("x-middleware-subrequest");
+  const { userId } = await auth()
+  
   if (hasSubrequestHeader) {
     return NextResponse.json(
       { error: "Unauthorized request" },
@@ -25,8 +28,19 @@ export default clerkMiddleware((auth, req) => {
     );
   }
 
-  // If the route is not public, rely on layout.tsx for auth protection
-  // Removing the problematic auth check here since we handle it in layout.tsx
+  if (!userId && isProtectedRoute(req)) {
+    // Redirect to home page with sign-in modal trigger and return URL
+    const url = new URL('/', req.url);
+    url.searchParams.set('showSignIn', 'true');
+    // Encode the full URL to handle special characters and preserve query parameters
+    url.searchParams.set('returnTo', encodeURIComponent(req.url));
+    return NextResponse.redirect(url);
+  }
+
+  if (isPublicRoute(req)) {
+    return NextResponse.next();
+  }
+
   return NextResponse.next();
 });
 

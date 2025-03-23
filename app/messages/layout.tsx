@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useChatCookieTokens } from "@/hooks/useChatCookieTokens";
+import MessagesNavbar from "@/components/MessagesNavbar";
 
 export default function MessagesLayout({
   children,
@@ -20,7 +21,11 @@ export default function MessagesLayout({
   useEffect(() => {
     // Check if the user is authenticated with Clerk
     if (isLoaded && !isSignedIn) {
-      router.push('/sign-in?redirect_url=/messages');
+      const currentPath = window.location.pathname + window.location.search;
+      const redirectUrl = new URL('/', window.location.origin);
+      redirectUrl.searchParams.set('showSignIn', 'true');
+      redirectUrl.searchParams.set('returnTo', encodeURIComponent(currentPath));
+      router.push(redirectUrl.toString());
       return;
     }
 
@@ -42,18 +47,13 @@ export default function MessagesLayout({
     );
   }
 
-  // If not signed in or we don't have tokens, don't render children
+  // If not signed in or we don't have tokens, show loading state
   if (!isSignedIn || hasToken === false) {
     return (
       <div className="h-screen w-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-2">
-          <p className="text-sm text-muted-foreground">Authentication required</p>
-          <button 
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
-            onClick={() => router.push('/sign-in?redirect_url=/messages')}
-          >
-            Sign In
-          </button>
+          <div className="animate-spin h-6 w-6 border-2 border-gray-500 rounded-full border-t-transparent"></div>
+          <p className="text-sm text-muted-foreground">Authenticating...</p>
         </div>
       </div>
     );
@@ -61,7 +61,10 @@ export default function MessagesLayout({
 
   return (
     <div className="h-screen w-screen fixed inset-0">
-      {children}
+      <MessagesNavbar />
+      <div className="pt-14">
+        {children}
+      </div>
     </div>
   );
 } 
