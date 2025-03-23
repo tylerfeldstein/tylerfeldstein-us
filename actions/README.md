@@ -25,7 +25,7 @@ Triggers the hello-world Inngest function with the provided email.
 
 **Example:**
 ```tsx
-import { triggerHelloWorld } from "@/app/actions/inngest";
+import { triggerHelloWorld } from "@/actions/inngest";
 
 // In a client component
 const handleSubmit = async (email: string) => {
@@ -54,7 +54,7 @@ Creates a streaming connection to Inngest real-time for a specific correlation I
 **Example:**
 ```tsx
 // This is handled internally by the useInngestRealtime hook
-import { getInngestStream } from "@/app/actions/inngest";
+import { getInngestStream } from "@/actions/inngest";
 
 // This would be used in a custom streaming implementation
 const stream = await getInngestStream("some-correlation-id");
