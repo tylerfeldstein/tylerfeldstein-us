@@ -22,6 +22,8 @@ import type * as inngestResults from "../inngestResults.js";
 import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as newMessage from "../newMessage.js";
+import type * as newMessageQueries from "../newMessageQueries.js";
 import type * as notifications from "../notifications.js";
 import type * as secureMessages from "../secureMessages.js";
 import type * as types_jwt from "../types/jwt.js";
@@ -45,6 +47,8 @@ declare const fullApi: ApiFromModules<{
   maintenance: typeof maintenance;
   messages: typeof messages;
   myFunctions: typeof myFunctions;
+  newMessage: typeof newMessage;
+  newMessageQueries: typeof newMessageQueries;
   notifications: typeof notifications;
   secureMessages: typeof secureMessages;
   "types/jwt": typeof types_jwt;

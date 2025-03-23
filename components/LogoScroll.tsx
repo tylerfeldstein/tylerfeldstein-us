@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from 'next/image';
+import { useTheme } from 'next-themes';
 
 // Animation container for continuous scrolling effect
 const InfiniteMovingCards = ({ 
@@ -104,6 +105,9 @@ const InfiniteMovingCards = ({
 
 // Main component
 const LogoScroll = () => {
+  const { resolvedTheme } = useTheme();
+  const isDarkMode = resolvedTheme === 'dark';
+
   // Company logos from resume
   const companies = [
     {
@@ -111,7 +115,7 @@ const LogoScroll = () => {
       logo: (
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
           <Image 
-            src="/companies/everbridge.png" 
+            src={isDarkMode && "/companies/everbridge_dark.svg" || "/companies/everbridge.png"} 
             alt="Everbridge - Company where Tyler Feldstein applied AI security expertise" 
             width={180} 
             height={72} 
@@ -139,7 +143,7 @@ const LogoScroll = () => {
       logo: (
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
           <Image 
-            src="/companies/caci.svg" 
+            src={isDarkMode && "/companies/caci_dark.svg" || "/companies/caci.svg"} 
             alt="CACI - Where Tyler Feldstein implemented AI security solutions" 
             width={180} 
             height={72} 
