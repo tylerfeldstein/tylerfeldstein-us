@@ -68,4 +68,15 @@ export default defineSchema({
   })
     .index("by_chatId", ["chatId"])
     .index("by_chatId_userId", ["chatId", "userId"]),
+    
+  // Telegram thread mappings
+  telegramThreadMappings: defineTable({
+    chatId: v.id("chats"),
+    telegramThreadId: v.number(),
+    telegramAdminId: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_chatId", ["chatId"])
+    .index("by_telegramThreadId", ["telegramThreadId"]),
 });

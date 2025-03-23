@@ -33,9 +33,12 @@ export function MessageInput({ chatId }: MessageInputProps) {
 
   // Update typing status
   useEffect(() => {
+    // Skip the effect if chatId is null
+    if (!chatId) return;
+    
     let typingTimeout: NodeJS.Timeout;
     
-    if (message.trim() && chatId) {
+    if (message.trim()) {
       setTypingStatus({ chatId, isTyping: true });
       
       // Clear the typing status after 2 seconds of no input
@@ -48,6 +51,11 @@ export function MessageInput({ chatId }: MessageInputProps) {
       if (typingTimeout) clearTimeout(typingTimeout);
     };
   }, [message, chatId, setTypingStatus]);
+
+  // If no chat is selected, don't render the input
+  if (!chatId) {
+    return null;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

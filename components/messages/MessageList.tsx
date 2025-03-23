@@ -80,7 +80,7 @@ export function MessageList({ chatId }: MessageListProps) {
           console.log(`  - Timestamp: ${new Date(msg.timestamp).toLocaleString()}`);
           
           // Log participant info for this sender
-          const senderInfo = participantsInfo.find((p: ParticipantInfo) => p.clerkId === msg.sender);
+          const senderInfo = participantsInfo.find(p => p.clerkId === msg.sender);
           console.log(`  - Sender info:`, senderInfo || 'Not found in participants');
         });
       }
@@ -163,7 +163,7 @@ export function MessageList({ chatId }: MessageListProps) {
           } else if (isAdminMessage) {
             // For admin messages, try to get the name from multiple sources
             const adminName = senderInfo?.name || 
-                      participantsInfo.find((p: ParticipantInfo) => p.role === "admin")?.name ||
+                      participantsInfo.find(p => p.role === "admin")?.name ||
                       currentUser?.name ||
                       "Admin";
             console.log("[MessageDisplay] Found admin name:", adminName);

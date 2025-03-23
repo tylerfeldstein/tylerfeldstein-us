@@ -9,8 +9,10 @@ import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { useUser } from "@clerk/nextjs";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageSquareIcon, MessageSquarePlus } from "lucide-react";
 import { NewChatModal } from "./NewChatModal";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 
 // Constants for sidebar width
 const DEFAULT_SIDEBAR_WIDTH = 350; // Default width in pixels
@@ -27,9 +29,30 @@ export function ChatInterface() {
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
   const previousChatIdRef = useRef<Id<"chats"> | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   
   // Get chats for the current user
   const chats = useQuery(api.messages.listChats) || [];
+  
+  // Query the selected chat to verify it exists
+  const selectedChat = useQuery(
+    api.messages.getChat, 
+    selectedChatId ? { chatId: selectedChatId } : "skip"
+  );
+
+  // Check if the selected chat has been deleted
+  useEffect(() => {
+    if (selectedChatId && selectedChat === null) {
+      // Chat was deleted, reset the selection
+      console.log(`[ChatInterface] Selected chat ${selectedChatId} no longer exists, resetting selection`);
+      setSelectedChatId(null);
+      
+      // If there are other chats available, select the first one
+      if (chats.length > 0) {
+        setSelectedChatId(chats[0]._id);
+      }
+    }
+  }, [selectedChatId, selectedChat, chats]);
   
   // Get current user data to check if they're an admin
   const currentUser = useQuery(api.users.getMe);
@@ -252,48 +275,52 @@ export function ChatInterface() {
         </div>
       )}
       
-      {/* Main chat area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {selectedChatId && (
+      {/* Toggle button for sidebar on mobile - only shown when sidebar is closed */}
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="absolute top-2 left-2 z-50 rounded-full bg-primary/10 p-2 text-primary hover:bg-primary/20"
+        >
+          <MessageSquareIcon className="h-5 w-5" />
+        </button>
+      )}
+      
+      {/* Chat content */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Only render chat content if we have a selected chat and it exists in the database */}
+        {selectedChatId && selectedChat ? (
           <>
             <ChatHeader 
-              chatId={selectedChatId} 
-              onClose={() => setIsSidebarOpen(true)} 
+              chatId={selectedChatId}
+              onClose={() => setIsSidebarOpen(true)}
               onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
               showToggle={true}
             />
-            
-            <div className="flex flex-1 flex-col relative overflow-hidden">
-              <MessageList chatId={selectedChatId} />
-              <MessageInput chatId={selectedChatId} />
-            </div>
+            <MessageList chatId={selectedChatId} />
+            <MessageInput chatId={selectedChatId} />
           </>
-        )}
-        
-        {!selectedChatId && (
+        ) : (
           <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
-            <p className="text-muted-foreground mb-4">Select a chat or start a new conversation</p>
-            <button
-              onClick={handleNewChat}
-              className="rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
-            >
-              New Chat
-            </button>
+            <MessageSquarePlus className="h-12 w-12 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Start a conversation</h2>
+            <p className="text-muted-foreground mb-6">
+              Create a new chat to start messaging
+            </p>
+            <Button onClick={handleNewChat}>
+              New Message
+            </Button>
           </div>
         )}
       </div>
-
-      {/* New Chat Modal */}
-      <NewChatModal
-        open={isNewChatModalOpen}
-        onClose={() => {
-          setIsNewChatModalOpen(false);
-          // Refresh chats list after modal closes
-          setTimeout(() => {
-            console.log("[ChatInterface] Refreshing chats after modal close");
-          }, 500);
-        }}
-      />
+      
+      {/* New chat modal for admins */}
+      {isNewChatModalOpen && (
+        <NewChatModal 
+          open={isNewChatModalOpen} 
+          onClose={() => setIsNewChatModalOpen(false)}
+          onChatCreated={handleChatCreated}
+        />
+      )}
     </div>
   );
 } 

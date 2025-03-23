@@ -104,6 +104,40 @@ export const sendMessage = mutation({
       throw new Error("You are not a participant in this chat");
     }
     
+    // Add security validation for message content
+    // Check for potential XSS or script injection
+    const suspiciousPatterns = [
+      /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
+      /javascript:/gi,
+      /on\w+=(["'])[\s\S]*?\1/gi,
+      /<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi,
+      /<img[\s\S]*?onerror[\s\S]*?>/gi
+    ];
+
+    const hasSuspiciousContent = suspiciousPatterns.some(pattern => 
+      pattern.test(args.content)
+    );
+
+    if (hasSuspiciousContent) {
+      console.warn(`SECURITY WARNING: User ${userId} attempted to send potentially malicious content to chat ${args.chatId}`);
+      throw new Error("Message contains potentially unsafe content");
+    }
+    
+    // Implement basic rate limiting
+    // Get recent messages from this user to check for flooding
+    const recentTimeWindow = Date.now() - 10000; // Last 10 seconds
+    const recentMessages = await ctx.db
+      .query("messages")
+      .withIndex("by_chatId", q => q.eq("chatId", args.chatId))
+      .filter(q => q.eq(q.field("sender"), userId) && q.gt(q.field("timestamp"), recentTimeWindow))
+      .collect();
+
+    // If user has sent more than 5 messages in the last 10 seconds, reject the request
+    if (recentMessages.length >= 5) {
+      console.warn(`SECURITY WARNING: Rate limit exceeded - User ${userId} sent more than 5 messages in 10 seconds`);
+      throw new Error("You're sending messages too quickly. Please wait a moment and try again.");
+    }
+    
     // Create updates object for the chat
     let chatUpdates: any = { updatedAt: Date.now() };
     
@@ -261,6 +295,29 @@ export const markMessagesAsRead = mutation({
     const userId = auth.subject;
     console.log(`[markMessagesAsRead] Marking messages as read in chat ${args.chatId} for user ${userId}`);
     
+    // Verify chat exists and user is a participant
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) {
+      console.warn(`[markMessagesAsRead] Chat ${args.chatId} not found`);
+      throw new Error("Chat not found");
+    }
+    
+    // Check if user is actually a participant in this chat
+    const isParticipant = chat.participantIds.includes(userId);
+    
+    // Get user info to check if they're an admin
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .unique();
+    
+    const isAdmin = currentUser?.role === "admin";
+    
+    if (!isParticipant && !isAdmin) {
+      console.warn(`SECURITY WARNING: User ${userId} attempted to mark messages as read in chat ${args.chatId} without being a participant`);
+      throw new Error("Access denied. You are not a participant in this chat.");
+    }
+    
     // Get all messages in this chat
     const allMessages = await ctx.db
       .query("messages")
@@ -335,34 +392,15 @@ export const listChats = query({
       const allChats = await ctx.db.query("chats").collect();
       
       // Helper function to check if IDs might match despite format differences
-      const mightBeUser = (id: string) => {
+      const isAuthorizedUser = (id: string) => {
         if (!id || !userId) return false;
-        // Direct match
-        if (id === userId) return true;
-        // Check if the part after the last underscore matches
-        // For example: "user_2uh5bqmJoRBxGFftqp6Rju4xdoX" matches "clerk_2uh5bqmJoRBxGFftqp6Rju4xdoX"
-        const idParts = id.split('_');
-        const userIdParts = userId.split('_');
-        return idParts[idParts.length - 1] === userIdParts[userIdParts.length - 1];
+        return id === userId; // Only exact matches are allowed
       };
       
-      // Filter for chats that include this user
+      // Filter for chats where the user is the creator OR a participant
       chats = allChats.filter(chat => {
-        // Check creator ID
-        if (mightBeUser(chat.createdBy)) {
-          console.log(`[listChats] User ${userId} created chat ${chat._id} (${chat.name})`);
-          return true;
-        }
-        
-        // Check participant IDs
-        for (const participantId of chat.participantIds) {
-          if (mightBeUser(participantId)) {
-            console.log(`[listChats] User ${userId} is participant in chat ${chat._id} (${chat.name})`);
-            return true;
-          }
-        }
-        
-        return false;
+        return chat.createdBy === userId || 
+               (chat.participantIds && chat.participantIds.includes(userId));
       });
       
       console.log(`[listChats] Found ${chats.length} chats for regular user ${userId} after manual filtering`);
@@ -422,12 +460,9 @@ export const listChats = query({
     const processedChats = await Promise.all(
       chats.map(async (chat) => {
         // Helper function to check if IDs might match
-        const mightBeThisUser = (id: string) => {
+        const isAuthorizedThisUser = (id: string) => {
           if (!id || !userId) return false;
-          if (id === userId) return true;
-          const idParts = id.split('_');
-          const userIdParts = userId.split('_');
-          return idParts[idParts.length - 1] === userIdParts[userIdParts.length - 1];
+          return id === userId;
         };
       
         // Get the most recent message for this chat
@@ -443,7 +478,7 @@ export const listChats = query({
         
         // Format participants info - exclude the current user
         const chatParticipantsInfo = chat.participantIds
-          .filter((id) => !mightBeThisUser(id)) // Exclude current user with flexible matching
+          .filter((id) => !isAuthorizedThisUser(id)) // Exclude current user with flexible matching
           .map((id) => {
             // Try to find this participant's info
             const info = participantsInfo.get(id);
@@ -534,28 +569,17 @@ export const getMessages = query({
       return [];
     }
     
-    // For admins, skip participation check
+    // For non-admins, verify strict access rights
     if (!isAdmin) {
-      // Helper function to check if IDs might match despite format differences
-      const mightBeUser = (id: string) => {
-        if (!id || !userId) return false;
-        // Direct match
-        if (id === userId) return true;
-        // Check if the part after the last underscore matches
-        const idParts = id.split('_');
-        const userIdParts = userId.split('_');
-        return idParts[idParts.length - 1] === userIdParts[userIdParts.length - 1];
-      };
-      
-      // For non-admins, check if user is a participant
-      const userIsParticipant = chat.participantIds.some(participantId => mightBeUser(participantId));
-      const userIsCreator = mightBeUser(chat.createdBy);
+      // For non-admins, check if user is a participant with strict equality
+      const userIsParticipant = chat.participantIds.includes(userId);
+      const userIsCreator = chat.createdBy === userId;
       
       console.log(`[getMessages] User is participant: ${userIsParticipant}, User is creator: ${userIsCreator}`);
       
       if (!userIsParticipant && !userIsCreator) {
-        console.log(`[getMessages] User ${userId} is not a participant in chat ${chatId}, access denied`);
-        return [];
+        console.warn(`SECURITY WARNING: User ${userId} attempted to access messages in chat ${chatId} without permission`);
+        throw new Error("Access denied. You are not authorized to view this chat.");
       }
     }
     
@@ -699,12 +723,14 @@ export const getChat = query({
     const chat = await ctx.db.get(args.chatId);
     if (!chat) throw new Error("Chat not found");
     
-    // Check if user is a participant or an admin
+    // Check if user is a participant or an admin with strict equality
     const isParticipant = chat.participantIds.includes(userId);
+    const isCreator = chat.createdBy === userId;
     const isAdmin = user?.role === "admin"; // Treat undefined role as non-admin
     
-    if (!isParticipant && !isAdmin) {
-      throw new Error("Not a participant in this chat");
+    if (!isParticipant && !isCreator && !isAdmin) {
+      console.warn(`SECURITY WARNING: User ${userId} attempted to access chat ${args.chatId} without permission`);
+      throw new Error("Access denied. You are not authorized to view this chat.");
     }
     
     // Get all users for participants
@@ -881,27 +907,15 @@ export const getUnreadMessageCounts = query({
     const allChats = await ctx.db.query("chats").collect();
     
     // Helper function to check if IDs might match despite format differences
-    const mightBeUser = (id: string) => {
+    const isAuthorizedUser = (id: string) => {
       if (!id || !userId) return false;
-      // Direct match
-      if (id === userId) return true;
-      // Check if the part after the last underscore matches
-      const idParts = id.split('_');
-      const userIdParts = userId.split('_');
-      return idParts[idParts.length - 1] === userIdParts[userIdParts.length - 1];
+      return id === userId; // Only exact matches are allowed
     };
     
-    // Filter for chats that include this user
+    // Filter for chats that include this user (exact match only)
     const chats = allChats.filter(chat => {
-      // Check creator ID
-      if (mightBeUser(chat.createdBy)) return true;
-      
-      // Check participant IDs
-      for (const participantId of chat.participantIds) {
-        if (mightBeUser(participantId)) return true;
-      }
-      
-      return false;
+      return chat.createdBy === userId || 
+             (chat.participantIds && chat.participantIds.includes(userId));
     });
     
     console.log(`[getUnreadMessageCounts] Found ${chats.length} chats for user ${userId}`);
@@ -923,14 +937,14 @@ export const getUnreadMessageCounts = query({
       // Using the suffix matching for both sender and read checks
       const unreadCount = messages.filter(msg => {
         // Check if message was sent by current user (using suffix matching)
-        const isSentByUser = mightBeUser(msg.sender);
+        const isSentByUser = isAuthorizedUser(msg.sender);
         if (isSentByUser) return false;
         
         // Check if message has been read by current user
         const readBy = msg.read || [];
         
         // For each ID in the read list, check if it might be the current user
-        const hasBeenReadByUser = readBy.some(readId => mightBeUser(readId));
+        const hasBeenReadByUser = readBy.some(readId => isAuthorizedUser(readId));
         
         return !hasBeenReadByUser;
       }).length;
