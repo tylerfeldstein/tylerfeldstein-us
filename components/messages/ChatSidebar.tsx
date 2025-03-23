@@ -35,6 +35,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import UnreadBadge from "./UnreadBadge";
 
+// Define participant info interface
+interface ParticipantInfo {
+  clerkId: string;
+  name?: string;
+  email?: string;
+  imageUrl?: string;
+  role?: string;
+}
+
 // Helper function to format timestamp like iPhone messages
 function formatTimestamp(timestamp: number): string {
   const date = new Date(timestamp);
@@ -106,6 +115,9 @@ export function ChatSidebar({
                 variant={selectedChatId === chat._id ? "secondary" : "ghost"}
                 className={cn(
                   "w-full justify-start relative", 
+                  selectedChatId === chat._id && resolvedTheme === "light" 
+                    ? "bg-blue-50 hover:bg-blue-100 text-blue-800" 
+                    : "",
                   isExpanded 
                     ? "px-2 py-6" 
                     : "flex-col p-0 h-12 w-12 justify-center items-center m-auto collapsed-avatar",
@@ -129,8 +141,89 @@ export function ChatSidebar({
                 {isExpanded && (
                   <div className="flex-1 text-left truncate">
                     <span className="inline-block max-w-[90%] truncate">
-                      {chat.name}
+                      {/* Format chat name like iOS Messages */}
+                      {(() => {
+                        console.log(`[ChatSidebar] Processing chat ${chat._id}, name: ${chat.name}`);
+                        console.log(`[ChatSidebar] Chat has ${chat.participantsInfo?.length || 0} participants info`);
+                        
+                        // Check if we have last message info
+                        if (chat.lastMessageContent) {
+                          console.log(`[ChatSidebar] Chat has last message: ${chat.lastMessageContent.substring(0, 20)}...`);
+                          
+                          // First priority: always show admin name if a message exists
+                          if (chat.participantsInfo) {
+                            // Deep debug for participantsInfo
+                            console.log(`[ChatSidebar] Detailed participantsInfo:`, JSON.stringify(chat.participantsInfo));
+                            
+                            // Try to find admin in participants
+                            const adminParticipant = chat.participantsInfo.find((p: ParticipantInfo) => p && p.role === "admin");
+                            if (adminParticipant) {
+                              console.log(`[ChatSidebar] Found admin participant:`, adminParticipant);
+                              return adminParticipant.name || adminParticipant.email || "Support";
+                            } else {
+                              console.log(`[ChatSidebar] No admin found in participants for chat ${chat._id}`);
+                            }
+                          }
+                          
+                          // If this chat has messages but we don't have a good name yet, call it "Support Chat"
+                          return "Support Chat";
+                        }
+                        
+                        // Check if chat has participants
+                        if (chat.participantsInfo && chat.participantsInfo.length > 0) {
+                          // First look for admin users in participants
+                          const adminParticipant = chat.participantsInfo.find((p: ParticipantInfo) => p && p.role === "admin");
+                          if (adminParticipant) {
+                            console.log(`[ChatSidebar] Found admin participant in participantsInfo:`, adminParticipant);
+                            return adminParticipant.name || adminParticipant.email || "Support";
+                          }
+
+                          // For 1:1 chats, show the other person's name
+                          if (chat.participantsInfo.length === 1) {
+                            const participant = chat.participantsInfo[0];
+                            return participant?.name || 
+                                   participant?.email || 
+                                   "Unknown User";
+                          }
+                          // For group chats, show first two names + count
+                          else if (chat.participantsInfo.length > 1) {
+                            const names = chat.participantsInfo
+                              .filter((p: ParticipantInfo) => p) // Filter out null values
+                              .slice(0, 2)
+                              .map((p: ParticipantInfo) => p.name || p.email || "User")
+                              .join(", ");
+                            
+                            if (chat.participantsInfo.length > 2) {
+                              return `${names} +${chat.participantsInfo.length - 2}`;
+                            }
+                            return names;
+                          }
+                        }
+                        
+                        // If this is not a "New Chat", use its name
+                        if (chat.name && chat.name !== "New Chat") {
+                          return chat.name;
+                        }
+                        
+                        // Default fallback
+                        return "New Message";
+                      })()}
                     </span>
+                    {/* Show last message preview */}
+                    {chat.lastMessageContent && (
+                      <div className="text-xs text-muted-foreground truncate mt-0.5 flex justify-between">
+                        <span className="truncate max-w-[80%]">
+                          {chat.lastMessageContent.length > 30
+                            ? chat.lastMessageContent.substring(0, 27) + "..."
+                            : chat.lastMessageContent}
+                        </span>
+                        {chat.lastMessageTimestamp && (
+                          <span className="text-[10px] tabular-nums">
+                            {formatTimestamp(chat.lastMessageTimestamp)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
                 

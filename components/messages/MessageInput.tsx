@@ -70,7 +70,7 @@ export function MessageInput({ chatId }: MessageInputProps) {
       <div className={`px-4 md:px-8 pb-6 ${
         resolvedTheme === "dark" 
           ? "bg-gradient-to-t from-black/50 via-black/20 to-transparent/20 backdrop-blur-sm" 
-          : "bg-gradient-to-t from-[#f5f7fa]/80 via-[#f5f7fa]/60 to-transparent backdrop-blur-sm"
+          : "bg-gradient-to-t from-blue-50/80 via-blue-50/40 to-transparent backdrop-blur-sm"
       }`}>
         <div className="max-w-3xl mx-auto">
           <form 
@@ -79,7 +79,7 @@ export function MessageInput({ chatId }: MessageInputProps) {
               relative rounded-xl border shadow-sm overflow-hidden
               ${resolvedTheme === "dark" 
                 ? "border-white/30 bg-black/50 backdrop-blur-md" 
-                : "border-gray-300/50 bg-white/70 backdrop-blur-md"
+                : "border-blue-200 bg-white/80 backdrop-blur-md"
               }
               transition-all duration-300
             `}

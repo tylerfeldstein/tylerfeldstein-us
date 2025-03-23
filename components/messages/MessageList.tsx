@@ -25,6 +25,7 @@ interface Message {
   read?: string[];
   isAdmin?: boolean;
   isSystemMessage?: boolean;
+  senderInfo?: ParticipantInfo;
 }
 
 // Define participant info structure
@@ -79,7 +80,7 @@ export function MessageList({ chatId }: MessageListProps) {
           console.log(`  - Timestamp: ${new Date(msg.timestamp).toLocaleString()}`);
           
           // Log participant info for this sender
-          const senderInfo = participantsInfo.find(p => p.clerkId === msg.sender);
+          const senderInfo = participantsInfo.find((p: ParticipantInfo) => p.clerkId === msg.sender);
           console.log(`  - Sender info:`, senderInfo || 'Not found in participants');
         });
       }
@@ -127,6 +128,9 @@ export function MessageList({ chatId }: MessageListProps) {
           // Determine if this is a system message and if admin is viewing it
           const isSystemMessage = message.isSystemMessage || false;
           
+          // Use isAdmin from the message itself and not from client side checks
+          const isAdminMessage = message.isAdmin && !isSystemMessage;
+          
           // Check if message is read by the current user
           const isRead = message.read?.includes(user?.id || "");
           
@@ -139,17 +143,37 @@ export function MessageList({ chatId }: MessageListProps) {
           const formattedTime = format(messageDate, "h:mm a");
           
           // Find sender info in participantsInfo
-          const senderInfo = participantsInfo.find((p: ParticipantInfo) => 
+          const senderInfo = message.senderInfo || participantsInfo.find((p: ParticipantInfo) => 
             p.clerkId === message.sender ||
             (p.clerkId && message.sender && 
              p.clerkId.split('_').pop() === message.sender.split('_').pop())
           );
-          const senderName = isSystemMessage ? "Support" : (senderInfo?.name || senderInfo?.email || "User");
+
+          console.log(`[MessageDisplay] Message from ${message.sender}`, {
+            isAdmin: isAdminMessage,
+            senderInfo,
+            participantsInfo,
+            message
+          });
+          
+          // Handle system messages vs user/admin messages
+          let senderName;
+          if (isSystemMessage) {
+            senderName = "Support";
+          } else if (isAdminMessage) {
+            // For admin messages, try to get the name from multiple sources
+            const adminName = senderInfo?.name || 
+                      participantsInfo.find((p: ParticipantInfo) => p.role === "admin")?.name ||
+                      currentUser?.name ||
+                      "Admin";
+            console.log("[MessageDisplay] Found admin name:", adminName);
+            senderName = adminName;
+          } else {
+            senderName = senderInfo?.name || senderInfo?.email || "User";
+          }
+          
           const senderImage = isSystemMessage ? null : senderInfo?.imageUrl;
           const senderInitial = isSystemMessage ? "S" : senderName.charAt(0).toUpperCase();
-          
-          // Use isAdmin from the message itself and not from client side checks
-          const isAdminMessage = message.isAdmin && !isSystemMessage;
           
           // Determine message position - right for current user messages AND system messages for admin view
           const showOnRightSide = isUserMessage || isSupportMessageForAdmin;
@@ -159,10 +183,10 @@ export function MessageList({ chatId }: MessageListProps) {
               key={message._id} 
               className={`flex ${
                 showOnRightSide ? "justify-end" : "justify-start"
-              } items-start gap-3 mb-4`}
+              } items-center gap-3 mb-4`}
             >
               {!showOnRightSide && (
-                <div className="flex-shrink-0 mt-1">
+                <div className="flex-shrink-0">
                   <Avatar className="h-8 w-8">
                     {senderImage ? (
                       <AvatarImage src={senderImage} alt={senderName} />
@@ -184,10 +208,12 @@ export function MessageList({ chatId }: MessageListProps) {
               
               <div className={`flex flex-col max-w-[80%] ${showOnRightSide ? "items-end" : "items-start"}`}>
                 {!showOnRightSide && (
-                  <span className="text-xs text-muted-foreground mb-1">
+                  <span className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                     {senderName}
                     {isAdminMessage && (
-                      <span className="ml-1 text-[10px] text-destructive">(Admin)</span>
+                      <span className="text-[10px] px-1 py-0.5 rounded bg-destructive/10 text-destructive font-medium">
+                        Admin
+                      </span>
                     )}
                   </span>
                 )}
@@ -202,13 +228,13 @@ export function MessageList({ chatId }: MessageListProps) {
                       ? isSupportMessageForAdmin
                         ? resolvedTheme === "dark" 
                           ? "bg-indigo-600/80 text-white" 
-                          : "bg-indigo-500/80 text-white"
+                          : "bg-indigo-400/90 text-white"
                         : resolvedTheme === "dark" 
                           ? "bg-primary/90 text-primary-foreground" 
-                          : "bg-primary/90 text-primary-foreground"
+                          : "bg-blue-500/80 text-white shadow-sm"
                       : resolvedTheme === "dark" 
                         ? "bg-muted/90" 
-                        : "bg-muted/90"
+                        : "bg-gray-100 text-gray-800 shadow-sm"
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -222,7 +248,7 @@ export function MessageList({ chatId }: MessageListProps) {
               </div>
               
               {showOnRightSide && (
-                <div className="flex-shrink-0 mt-1">
+                <div className="flex-shrink-0">
                   <Avatar className="h-8 w-8">
                     {isSupportMessageForAdmin ? (
                       <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-medium">

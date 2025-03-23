@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, X } from "lucide-react";
 
@@ -59,7 +60,29 @@ export function AdminUserSelector({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="rounded-md border p-2 mb-4 bg-card">
+      <label className="text-sm font-medium text-foreground mb-2 block">
+        Select Chat Participants
+      </label>
+      
+      <div className="flex flex-wrap gap-2 mb-2">
+        {selectedUsers.map((userId) => {
+          const user = getUserDetails(userId);
+          return user ? (
+            <div
+              key={userId}
+              className="flex items-center gap-1.5 bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs"
+            >
+              <span>{user.name || user.email}</span>
+              <X
+                className="h-3.5 w-3.5 cursor-pointer"
+                onClick={() => onRemoveUser(userId)}
+              />
+            </div>
+          ) : null;
+        })}
+      </div>
+      
       {/* Search input */}
       <div className="relative">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
@@ -71,35 +94,6 @@ export function AdminUserSelector({
           onChange={(e) => setSearchQuery(e.target.value)}
         />
       </div>
-      
-      {/* Selected users */}
-      {selectedUsers.length > 0 && (
-        <div className="flex flex-wrap gap-2 my-2">
-          {selectedUsers.map((userId) => {
-            const user = getUserDetails(userId);
-            return (
-              <div 
-                key={userId}
-                className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-full pl-1 pr-2 py-1"
-              >
-                <Avatar className="h-6 w-6">
-                  <AvatarImage src={user?.imageUrl} alt={user?.name || user?.email || "User"} />
-                  <AvatarFallback>{getUserInitials(user?.name || user?.email || "?")}</AvatarFallback>
-                </Avatar>
-                <span className="text-xs">{user?.name || user?.email || "Unknown user"}</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-5 w-5 p-0" 
-                  onClick={() => onRemoveUser(userId)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      )}
       
       {/* Available users */}
       <ScrollArea className="h-40 border rounded-md p-2">

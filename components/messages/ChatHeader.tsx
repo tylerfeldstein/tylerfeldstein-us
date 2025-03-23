@@ -26,6 +26,14 @@ import {
   ArrowLeftIcon,
 } from "lucide-react";
 
+interface ParticipantInfo {
+  clerkId: string;
+  name?: string;
+  email?: string;
+  imageUrl?: string;
+  role?: string;
+}
+
 interface ChatHeaderProps {
   chatId: Id<"chats">;
   onClose: () => void;
@@ -45,6 +53,10 @@ export function ChatHeader({
   
   // Get chat details
   const chat = useQuery(api.messages.getChat, { chatId });
+  
+  // Get current user role
+  const currentUser = useQuery(api.users.getMe);
+  const isAdmin = currentUser?.role === "admin";
   
   // Delete chat mutation
   const deleteChat = useMutation(api.messages.deleteChat);
@@ -66,18 +78,47 @@ export function ChatHeader({
   
   // Find the other participants in the chat (excluding current user)
   const otherParticipants = chat?.participantsInfo?.filter(
-    (p) => p.clerkId !== user?.id
+    (p: ParticipantInfo) => p?.clerkId !== user?.id
   ) || [];
   
   // Get the primary participant to show
   const primaryParticipant = otherParticipants[0];
   
-  // Format display name - default to chat name for group chats
-  const displayName = isGroupChat 
-    ? chat?.name || "Group Chat" 
-    : primaryParticipant?.name || 
-      primaryParticipant?.email || 
-      "Chat";
+  // Format display name based on user role and chat state
+  let displayName = chat?.name;
+  
+  // First check for admin participants if the current user is not an admin
+  if (!isAdmin && otherParticipants.length > 0) {
+    const adminParticipant = otherParticipants.find((p: ParticipantInfo) => p?.role === "admin");
+    if (adminParticipant) {
+      displayName = adminParticipant.name || adminParticipant.email || "Support";
+    }
+  }
+  // For direct messages (1:1 chats)
+  else if (otherParticipants.length === 1) {
+    const otherUser = otherParticipants[0];
+    // Use name > email > fallback
+    displayName = otherUser?.name || otherUser?.email || "Unknown User";
+  }
+  // For group chats with no name
+  else if (isGroupChat && (!displayName || displayName === "New Chat")) {
+    // Create a name from the first 2 participants
+    const names = otherParticipants
+      .slice(0, 2)
+      .map((p: ParticipantInfo) => p?.name || p?.email || "User")
+      .join(", ");
+    
+    // Add "+X more" if there are more than 2 other participants
+    if (otherParticipants.length > 2) {
+      displayName = `${names} +${otherParticipants.length - 2} more`;
+    } else {
+      displayName = names;
+    }
+  }
+  // For new chats with no replies yet
+  else if (displayName === "New Chat") {
+    displayName = "New Message";
+  }
   
   return (
     <div className={cn(

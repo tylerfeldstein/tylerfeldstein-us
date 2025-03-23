@@ -41,9 +41,10 @@ export const createChat = mutation({
     
     console.log(`[createChat] Chat participants: ${JSON.stringify(participantIds)}`);
     
-    // Create the chat
+    // Create the chat (we'll let the chat header handle the display name)
+    // Set default name, but it will be displayed based on participants
     const chat = await ctx.db.insert("chats", {
-      name: args.name,
+      name: "New Chat",
       createdBy: creatorId,  // Use the exact ID from auth
       participantIds: participantIds,
       createdAt: Date.now(),
@@ -103,6 +104,15 @@ export const sendMessage = mutation({
       throw new Error("You are not a participant in this chat");
     }
     
+    // Create updates object for the chat
+    let chatUpdates: any = { updatedAt: Date.now() };
+    
+    // If the sender is not already in participants, add them
+    if (!isParticipant) {
+      console.log(`[sendMessage] Adding sender ${userId} to participants for chat ${args.chatId}`);
+      chatUpdates.participantIds = [...chat.participantIds, userId];
+    }
+    
     // Create the message
     const messageId = await ctx.db.insert("messages", {
       chatId: args.chatId,
@@ -113,10 +123,8 @@ export const sendMessage = mutation({
       isAdmin: isAdmin, // Mark as admin message if sent by admin
     });
     
-    // Update the chat's updatedAt field
-    await ctx.db.patch(args.chatId, {
-      updatedAt: Date.now(),
-    });
+    // Update the chat
+    await ctx.db.patch(args.chatId, chatUpdates);
     
     return messageId;
   },
@@ -422,6 +430,17 @@ export const listChats = query({
           return idParts[idParts.length - 1] === userIdParts[userIdParts.length - 1];
         };
       
+        // Get the most recent message for this chat
+        const latestMessages = await ctx.db
+          .query("messages")
+          .withIndex("by_chatId_timestamp", (q) => 
+            q.eq("chatId", chat._id)
+          )
+          .order("desc")
+          .take(1);
+        
+        const lastMessage = latestMessages.length > 0 ? latestMessages[0] : null;
+        
         // Format participants info - exclude the current user
         const chatParticipantsInfo = chat.participantIds
           .filter((id) => !mightBeThisUser(id)) // Exclude current user with flexible matching
@@ -443,16 +462,28 @@ export const listChats = query({
             return null;
           });
         
-        // Get the most recent message for this chat
-        const latestMessages = await ctx.db
-          .query("messages")
-          .withIndex("by_chatId_timestamp", (q) => 
-            q.eq("chatId", chat._id)
-          )
-          .order("desc")
-          .take(1);
-        
-        const lastMessage = latestMessages.length > 0 ? latestMessages[0] : null;
+        // For non-admin users viewing threads with admin messages, we need to ensure admin info is included
+        if (!isAdmin) {
+          // Check if there are any messages and if any admin is already in the participants list
+          const hasAdminParticipant = chatParticipantsInfo.some(p => p && p.role === "admin");
+          
+          if (lastMessage && !hasAdminParticipant) {
+            console.log(`[listChats] Chat ${chat._id} has messages but no admin in participants`);
+            
+            // Get the list of admins from our user records
+            const admins = Array.from(participantsInfo.values()).filter(p => p.role === "admin");
+            
+            if (admins.length > 0) {
+              // Get the admin who created this chat or the first admin
+              const preferredAdmin = admins.find(admin => admin.clerkId === chat.createdBy) || admins[0];
+              
+              if (preferredAdmin) {
+                console.log(`[listChats] Adding admin ${preferredAdmin.name} to chat ${chat._id} participants for UI display`);
+                chatParticipantsInfo.push(preferredAdmin);
+              }
+            }
+          }
+        }
         
         // Return the chat with participant info and last message
         return {
@@ -577,6 +608,7 @@ export const getMessages = query({
           name: user.name,
           email: user.email,
           imageUrl: user.imageUrl,
+          role: user.role,
         });
       }
     });
@@ -597,14 +629,29 @@ export const getMessages = query({
         }
       }
       
+      // If still no match and it's an admin, get the current user who's an admin
+      if (!matchedSenderInfo && message.isAdmin) {
+        // For admin messages with no sender info, try to find an admin user
+        for (const [key, value] of sendersInfo.entries()) {
+          if (value.role === "admin") {
+            matchedSenderInfo = value;
+            break;
+          }
+        }
+      }
+      
+      // Default sender info if all else fails
+      const defaultSenderInfo = {
+        clerkId: message.sender,
+        name: message.isAdmin ? "Admin" : (message.isSystemMessage ? "Support" : "Unknown User"),
+        email: "unknown@example.com",
+        imageUrl: "",
+        role: message.isAdmin ? "admin" : "user",
+      };
+      
       return {
         ...message,
-        senderInfo: matchedSenderInfo || {
-          clerkId: message.sender,
-          name: "Unknown User",
-          email: "unknown@example.com",
-          imageUrl: "",
-        },
+        senderInfo: matchedSenderInfo || defaultSenderInfo,
         isCurrentUser: message.sender === userId || 
           (message.sender.split('_').pop() === userId.split('_').pop()),
       };
@@ -673,21 +720,33 @@ export const getChat = query({
       }
     }
     
-    // Map participants to their info
-    const participantsInfo = chat.participantIds.map(participantId => {
-      const participantUser = userMap.get(participantId);
-      if (!participantUser) {
-        return { clerkId: participantId };
-      }
-      
-      return {
-        clerkId: participantId,
-        name: participantUser.name,
-        email: participantUser.email,
-        imageUrl: participantUser.imageUrl,
-        role: participantUser.role,
-      };
-    });
+    // Get details for all participants
+    const participantsInfo = await Promise.all(
+      chat.participantIds.map(async (userId) => {
+        const user = await ctx.db
+          .query("users")
+          .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+          .unique();
+        
+        if (user) {
+          return {
+            clerkId: user.clerkId,
+            name: user.name,
+            email: user.email,
+            imageUrl: user.imageUrl,
+            role: user.role,
+          };
+        }
+        
+        return {
+          clerkId: userId,
+          name: "Unknown User",
+          email: null,
+          imageUrl: null,
+          role: "user", // Default role for unknown users
+        };
+      })
+    );
     
     return {
       _id: chat._id,
