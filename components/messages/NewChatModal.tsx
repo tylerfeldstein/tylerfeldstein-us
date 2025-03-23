@@ -10,13 +10,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "next/navigation";
 import { AdminUserSelector } from "./AdminUserSelector";
 import { Loader2 } from "lucide-react";
+import { Id } from "@/convex/_generated/dataModel";
 
 interface NewChatModalProps {
   open: boolean;
   onClose: () => void;
+  onChatCreated?: (chatId: Id<"chats">) => void;
 }
 
-export function NewChatModal({ open, onClose }: NewChatModalProps) {
+export function NewChatModal({ open, onClose, onChatCreated }: NewChatModalProps) {
   const [chatName, setChatName] = useState("New Chat");
   const [initialMessage, setInitialMessage] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -49,11 +51,16 @@ export function NewChatModal({ open, onClose }: NewChatModalProps) {
       
       const chatId = await createChat({
         name: chatName,
-        initialMessage: initialMessage.trim() || undefined,
-        participantIds: isAdmin ? selectedUsers : undefined,
+        initialMessage: initialMessage || "Hello! How can I help you today?",
+        participantIds: isAdmin ? selectedUsers : [],
       });
       
-      console.log("[NewChatModal] Chat created:", chatId);
+      console.log("[NewChatModal] Chat created with ID:", chatId);
+      
+      if (onChatCreated) {
+        onChatCreated(chatId);
+      }
+      
       onClose();
       router.push(`/messages/${chatId}`);
     } catch (err) {

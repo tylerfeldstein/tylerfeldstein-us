@@ -18,6 +18,7 @@ import type * as auth from "../auth.js";
 import type * as inngestResults from "../inngestResults.js";
 import type * as messages from "../messages.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as notifications from "../notifications.js";
 import type * as users from "../users.js";
 
 /**
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   inngestResults: typeof inngestResults;
   messages: typeof messages;
   myFunctions: typeof myFunctions;
+  notifications: typeof notifications;
   users: typeof users;
 }>;
 export declare const api: FilterApi<

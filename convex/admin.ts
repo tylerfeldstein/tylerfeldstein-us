@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuth } from "./auth";
+import { api } from "./_generated/api";
 
 /**
  * Delete all chats and messages - DANGER: Admin only
@@ -177,4 +178,4 @@ export const createOneOnOneChat = mutation({
       chatId,
     };
   },
-}); 
+});
