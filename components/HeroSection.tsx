@@ -51,74 +51,100 @@ const HeroSection = () => {
 
   return (
     <section className="relative pt-24 pb-24 overflow-hidden" id="home">
-      <div className="container px-4 md:px-6 mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <h1 className="text-5xl font-bold tracking-tighter mb-4 text-foreground">
-              Tyler Feldstein
-            </h1>
-            <h2 className="text-2xl mb-6 text-foreground/90">
-              <span className="font-semibold">Cybersecurity Architect</span> & <span className="font-semibold">AI Engineer</span>
-            </h2>
+      <div className="container mx-auto px-4 md:px-6">
+        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-12 items-center">
+          {/* Content Section */}
+          <div className="w-full flex flex-col items-center">
+            {/* Header with photo for mobile/tablet */}
+            <div className="w-full max-w-[600px] flex flex-col md:flex-row items-center justify-center md:justify-start lg:justify-start gap-8 lg:block mb-8 md:mb-12 lg:mb-8">
+              {/* Photo for mobile/tablet */}
+              <div className="w-48 h-48 md:w-40 md:h-40 lg:hidden relative shrink-0">
+                <div className="aspect-square gradient-ring">
+                  {/* Gradient rings and effects */}
+                  <div className="absolute inset-[-5%] rounded-full conic-gradient-ring animate-rotate-slow" 
+                    style={{ 
+                      filter: 'blur(12px)', 
+                      zIndex: 1,
+                      background: 'conic-gradient(from 0deg, rgba(59, 130, 246, 0.9), rgba(79, 70, 229, 0.9), rgba(147, 51, 234, 0.9), rgba(236, 72, 153, 0.9), rgba(59, 130, 246, 0.9))'
+                    }} 
+                  />
+                  <div className="absolute inset-[5%] flex items-center justify-center rounded-full overflow-hidden shadow-2xl" style={{ zIndex: 3 }}>
+                    {mounted && (
+                      <Image 
+                        src="/photos/DSC00379-min.JPG"
+                        alt="Tyler Feldstein - AI Engineer and Cybersecurity Architect"
+                        fill
+                        className="object-cover"
+                        priority
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Title and subtitle */}
+              <div className="flex flex-col items-center md:items-start lg:items-start">
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-4 text-foreground text-center md:text-left">
+                  Tyler Feldstein
+                </h1>
+                <h2 className="text-xl md:text-2xl mb-6 text-foreground/90 text-center md:text-left">
+                  <span className="font-semibold">Cybersecurity Architect</span> & <span className="font-semibold">AI Engineer</span>
+                </h2>
+              </div>
+            </div>
 
-            {/* Static SEO content - no client-side hydration issues */}
-            <div className="hidden" aria-hidden="true">
-              <h2>CISSP Certified Cybersecurity Architect and AI Engineer</h2>
-              <h3>Expert in Zero Trust, Cloud Security, Machine Learning for Threat Detection</h3>
-              {seoKeywords.map((keyword, index) => (
-                <span key={`seo-${index}`}>{keyword}</span>
-              ))}
-            </div>
-            
-            <p className="text-lg mb-4 text-foreground/80 max-w-[600px]">
-              CISSP-certified cybersecurity leader with proven expertise in AI-driven security solutions, zero trust architecture, and cloud security across AWS, Azure, and GCP environments.
-            </p>
-            
-            <p className="text-lg mb-8 text-foreground/80 max-w-[600px]">
-              I architect and implement advanced security frameworks leveraging machine learning for threat detection, automate security operations (SOAR), and design resilient cloud infrastructures that meet stringent compliance requirements including FedRAMP, NIST, and ISO 27001.
-            </p>
-            
-            <div className="flex flex-wrap gap-2 mb-8">
-              {["AWS", "Azure", "GCP", "Terraform", "Kubernetes", "ML/AI", "SOAR", "Zero Trust", "CISSP", "DevSecOps"].map((tag, idx) => (
-                <span key={`tag-${idx}`} className="px-3 py-1 bg-secondary/15 text-foreground/90 rounded-full text-sm font-medium">
-                  {tag}
-                </span>
-              ))}
-            </div>
-            
-            <div className="flex gap-4 mb-8">
-              {socialLinks.map((link) => (
+            {/* Rest of the content */}
+            <div className="w-full max-w-[600px] flex flex-col items-center lg:items-start">
+              <p className="text-lg mb-4 text-foreground/80 text-center lg:text-left">
+                CISSP-certified cybersecurity leader with proven expertise in AI-driven security solutions, zero trust architecture, and cloud security across AWS, Azure, and GCP environments.
+              </p>
+              
+              <p className="text-lg mb-8 text-foreground/80 text-center lg:text-left">
+                I architect and implement advanced security frameworks leveraging machine learning for threat detection, automate security operations (SOAR), and design resilient cloud infrastructures that meet stringent compliance requirements including FedRAMP, NIST, and ISO 27001.
+              </p>
+              
+              <div className="flex flex-wrap justify-center lg:justify-start gap-2 mb-8 w-full">
+                {["AWS", "Azure", "GCP", "Terraform", "Kubernetes", "ML/AI", "SOAR", "Zero Trust", "CISSP", "DevSecOps"].map((tag, idx) => (
+                  <span key={`tag-${idx}`} className="px-3 py-1 bg-secondary/15 text-foreground/90 rounded-full text-sm font-medium">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              
+              <div className="flex justify-center lg:justify-start gap-4 mb-8">
+                {socialLinks.map((link) => (
+                  <a 
+                    key={link.name}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground/70 hover:text-foreground transition-colors"
+                    aria-label={link.name}
+                  >
+                    {link.icon}
+                  </a>
+                ))}
+              </div>
+              
+              <div className="flex flex-wrap justify-center lg:justify-start gap-4">
                 <a 
-                  key={link.name}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-foreground/70 hover:text-foreground transition-colors"
-                  aria-label={link.name}
+                  href="#experience" 
+                  className="bg-secondary text-secondary-foreground px-6 py-2.5 rounded-md hover:bg-secondary/90 transition-colors"
                 >
-                  {link.icon}
+                  View Experience
                 </a>
-              ))}
-            </div>
-            
-            <div className="flex flex-wrap gap-4">
-              <a 
-                href="#experience" 
-                className="bg-secondary text-secondary-foreground px-6 py-2.5 rounded-md hover:bg-secondary/90 transition-colors"
-              >
-                View Experience
-              </a>
-              <a 
-                href="#contact" 
-                className="bg-foreground/10 text-foreground px-6 py-2.5 rounded-md hover:bg-foreground/20 transition-colors border border-foreground/20"
-              >
-                Contact Me
-              </a>
+                <a 
+                  href="#contact" 
+                  className="bg-foreground/10 text-foreground px-6 py-2.5 rounded-md hover:bg-foreground/20 transition-colors border border-foreground/20"
+                >
+                  Contact Me
+                </a>
+              </div>
             </div>
           </div>
           
-          <div className="relative">
-            {/* Outer circular container for the gradient ring */}
+          {/* Desktop Photo Section */}
+          <div className="relative hidden lg:block">
             <div className="aspect-square gradient-ring">
               {/* Main circular gradient ring */}
               <div className="absolute inset-[-5%] rounded-full conic-gradient-ring animate-rotate-slow" 
@@ -154,24 +180,12 @@ const HeroSection = () => {
                   {mounted && (
                     <Image 
                       src="/photos/DSC00379-min.JPG"
-                      alt="Tyler Feldstein - AI Engineer and Cybersecurity Architect specializing in machine learning for threat detection and zero trust architecture"
+                      alt="Tyler Feldstein - AI Engineer and Cybersecurity Architect"
                       fill
                       className="object-cover"
                       priority
                     />
                   )}
-                  
-                  {/* Glass shimmer effect over the photo */}
-                  <div className="absolute inset-0 overflow-hidden rounded-full">
-                    <div 
-                      className="absolute w-[200%] h-[200%] -top-[50%] -left-[50%] opacity-60"
-                      style={{
-                        background: 'linear-gradient(45deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0) 45%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 55%, rgba(255,255,255,0) 100%)',
-                        animation: 'random-shimmer 8s ease-in-out infinite',
-                        zIndex: 10
-                      }}
-                    />
-                  </div>
                 </div>
               </div>
               

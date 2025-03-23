@@ -8,6 +8,7 @@ import LogoScroll from '@/components/LogoScroll';
 import CareerSections from '@/components/CareerSections';
 import ConsultingRatesSection from '@/components/ConsultingRatesSection';
 import JsonLdSchema, { createPersonSchema, createWebsiteSchema } from '@/components/JsonLdSchema';
+import SignInModal from './components/SignInModal';
 import { Metadata } from 'next';
 
 // Additional metadata for the home page
@@ -20,6 +21,9 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <main className="overflow-hidden w-full main-gradient">
+      {/* Handle sign-in modal */}
+      <SignInModal />
+      
       {/* SEO - JSON-LD Structured Data */}
       <JsonLdSchema data={createPersonSchema()} />
       <JsonLdSchema data={createWebsiteSchema()} />

@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { forceLogout } from "@/actions/auth/cookieTokens";
 import { useChatCookieTokens } from "@/hooks/useChatCookieTokens";
@@ -58,6 +58,7 @@ export function ChatHeader({
   isMobile 
 }: ChatHeaderProps) {
   const { user } = useUser();
+  const { signOut } = useClerk();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -93,12 +94,23 @@ export function ChatHeader({
       // First clear the cookies from the client side
       await clearTokens();
       
-      // Then invalidate the tokens on the server and redirect
+      // Then invalidate the tokens on the server
       await forceLogout();
+      
+      // Finally, sign out from Clerk
+      await signOut();
+      
+      // Redirect to home
+      router.push('/');
     } catch (error) {
       console.error("Error during logout:", error);
-      // Fallback to simple redirect
-      router.push("/sign-in");
+      // Try to sign out from Clerk anyway
+      try {
+        await signOut();
+      } catch (clerkError) {
+        console.error("Error signing out from Clerk:", clerkError);
+      }
+      router.push('/');
     } finally {
       setIsLoggingOut(false);
     }

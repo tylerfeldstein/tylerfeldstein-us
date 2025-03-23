@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 
@@ -133,4 +133,47 @@ export const getByTokenId = query({
     
     return tokens.length > 0 ? tokens[0] : null;
   }
+});
+
+/**
+ * Internal function to clean up expired and invalidated tokens
+ * Runs on a schedule to prevent token table from growing too large
+ */
+export const cleanupExpiredTokens = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    
+    // Get all tokens that are either:
+    // 1. Expired (expiresAt < now)
+    // 2. Invalidated (isInvalidated = true)
+    // 3. Created more than 30 days ago (as a safety net)
+    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+    
+    // Delete tokens in batches to avoid timeout
+    const tokensToDelete = await ctx.db
+      .query("chatTokens")
+      .filter(q => 
+        q.or(
+          q.lt(q.field("expiresAt"), now),
+          q.eq(q.field("isInvalidated"), true),
+          q.lt(q.field("_creationTime"), thirtyDaysAgo)
+        )
+      )
+      .collect();
+    
+    console.log(`[cleanupExpiredTokens] Found ${tokensToDelete.length} tokens to delete`);
+    
+    // Delete tokens in parallel
+    const deletePromises = tokensToDelete.map(token => 
+      ctx.db.delete(token._id)
+    );
+    
+    await Promise.all(deletePromises);
+    
+    return {
+      deletedCount: tokensToDelete.length,
+      timestamp: now
+    };
+  },
 }); 
