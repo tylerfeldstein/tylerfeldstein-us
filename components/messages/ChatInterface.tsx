@@ -13,6 +13,10 @@ import { ChevronLeft, ChevronRight, MessageSquareIcon, MessageSquarePlus } from 
 import { NewChatModal } from "./NewChatModal";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
+import { EmptyStateMessage } from "./EmptyStateMessage";
+import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Constants for sidebar width
 const DEFAULT_SIDEBAR_WIDTH = 350; // Default width in pixels
@@ -258,84 +262,128 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden main-gradient">
+    <div className="flex h-full w-full overflow-hidden relative pt-0">
       {/* Sidebar for chats */}
-      {isSidebarOpen && (
-        <div 
-          ref={sidebarRef}
-          style={{ width: isSidebarExpanded ? `${sidebarWidth}px` : `${COLLAPSED_WIDTH}px` }}
-          className="flex-shrink-0 relative transition-width duration-300 ease-in-out border-r border-border/50"
-        >
-          <ChatSidebar
-            isSidebarOpen={isSidebarOpen}
-            setIsSidebarOpen={setIsSidebarOpen}
-            selectedChatId={selectedChatId}
-            setSelectedChatId={setSelectedChatId}
-            onNewChat={handleNewChat}
-            sidebarWidth={sidebarWidth}
-            isExpanded={isSidebarExpanded}
-          />
-          
-          {/* Toggle expand/collapse button */}
-          <div 
-            className="absolute right-0 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-accent/20 hover:bg-accent/30 rounded-full p-1 cursor-pointer z-50 shadow-md"
-            onClick={toggleSidebarExpanded}
+      <AnimatePresence mode="wait">
+        {isSidebarOpen && (
+          <motion.div 
+            ref={sidebarRef}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            style={{ width: isSidebarExpanded ? `${sidebarWidth}px` : `${COLLAPSED_WIDTH}px` }}
+            className="flex-shrink-0 relative transition-all duration-300 ease-in-out border-r border-border/50 h-full bg-background/80 backdrop-blur-sm z-20"
           >
-            {isSidebarExpanded ? (
-              <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <ChatSidebar
+              isSidebarOpen={isSidebarOpen}
+              setIsSidebarOpen={setIsSidebarOpen}
+              selectedChatId={selectedChatId}
+              setSelectedChatId={setSelectedChatId}
+              onNewChat={handleNewChat}
+              sidebarWidth={sidebarWidth}
+              isExpanded={isSidebarExpanded}
+            />
+            
+            {/* Toggle expand/collapse button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ 
+                      opacity: 1, 
+                      scale: 1,
+                      boxShadow: [
+                        "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                        "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                        "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)"
+                      ]
+                    }}
+                    transition={{ 
+                      delay: 0.3,
+                      boxShadow: {
+                        repeat: 1,
+                        duration: 1
+                      }
+                    }}
+                    className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 bg-primary hover:bg-primary/90 rounded-full p-2 cursor-pointer z-50 shadow-lg border border-background/20"
+                    onClick={toggleSidebarExpanded}
+                  >
+                    {isSidebarExpanded ? (
+                      <ChevronLeft className="h-5 w-5 text-primary-foreground" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-primary-foreground" />
+                    )}
+                  </motion.div>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>{isSidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            {/* Resizer - only shown when expanded */}
+            {isSidebarExpanded && (
+              <div
+                className="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-primary/20 transition-colors z-10"
+                onMouseDown={startResize}
+                onTouchStart={startResize}
+              ></div>
             )}
-          </div>
-          
-          {/* Resizer - only shown when expanded */}
-          {isSidebarExpanded && (
-            <div
-              className="resize-handle"
-              onMouseDown={startResize}
-              onTouchStart={startResize}
-            ></div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Toggle button for sidebar on mobile - only shown when sidebar is closed */}
-      {!isSidebarOpen && (
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className="absolute top-2 left-2 z-50 rounded-full bg-primary/10 p-2 text-primary hover:bg-primary/20"
-        >
-          <MessageSquareIcon className="h-5 w-5" />
-        </button>
-      )}
-      
-      {/* Chat content */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Only render chat content if we have a selected chat and it exists in the database */}
-        {selectedChatId && selectedChat ? (
-          <>
-            <ChatHeader
-              chatId={selectedChatId}
-              chatName={selectedChat.name || "Support Chat"}
-              participantCount={selectedChat.participantIds?.length || 0}
-              onBackClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              isMobile={!isSidebarOpen}
-            />
-            <MessageList chatId={selectedChatId} />
-            <MessageInput chatId={selectedChatId} />
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
-            <MessageSquarePlus className="h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Start a conversation</h2>
-            <p className="text-muted-foreground mb-6">
-              Create a new chat to start messaging
-            </p>
-            <Button onClick={handleNewChat}>
-              New Message
-            </Button>
-          </div>
+      <AnimatePresence>
+        {!isSidebarOpen && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setIsSidebarOpen(true)}
+            className="absolute top-3 left-3 z-50 rounded-full bg-background/80 backdrop-blur-sm p-2.5 shadow-lg border border-border/50 hover:bg-accent/30 transition-colors"
+          >
+            <MessageSquareIcon className="h-5 w-5 text-foreground" />
+          </motion.button>
         )}
+      </AnimatePresence>
+      
+      <div className="flex flex-1 h-full w-full overflow-hidden relative">
+        {/* Chat content area with MessageList and MessageInput */}
+        <div className={cn(
+          "flex-1 h-full flex flex-col overflow-hidden",
+          isSidebarOpen ? "relative lg:ml-0" : "ml-0"
+        )}>
+          {/* Chat content */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="flex-1 flex flex-col overflow-hidden relative w-full h-full"
+          >
+            {/* Only render chat content if we have a selected chat and it exists in the database */}
+            {selectedChatId && selectedChat ? (
+              <>
+                <ChatHeader
+                  chatId={selectedChatId}
+                  chatName={selectedChat.name || "Support Chat"}
+                  participantCount={selectedChat.participantIds?.length || 0}
+                  onBackClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  isMobile={!isSidebarOpen}
+                />
+                <div className="flex-1 overflow-hidden relative">
+                  <MessageList chatId={selectedChatId} />
+                </div>
+                <MessageInput chatId={selectedChatId} />
+              </>
+            ) : (
+              <EmptyStateMessage onNewChat={handleNewChat} />
+            )}
+          </motion.div>
+        </div>
       </div>
       
       {/* New chat modal for admins */}
