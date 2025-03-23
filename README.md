@@ -1,4 +1,4 @@
-# Chasm
+# Tyler Feldstein Website
 
 A modern web application built with Next.js 15, Convex, and Clerk authentication.
 
@@ -59,8 +59,8 @@ Before you begin, ensure you have the following installed:
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/chasm.git
-   cd chasm
+   git clone <repo>
+   cd tylerfeldstein-website
    ```
 
 2. Install dependencies:
