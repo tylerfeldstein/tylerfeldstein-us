@@ -3,15 +3,34 @@
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 
 const HeroSection = () => {
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { isSignedIn, isLoaded } = useUser();
+  const router = useRouter();
   
   // Ensure we only render theme-dependent elements after mounting
   useEffect(() => {
     setMounted(true);
   }, []);
+  
+  // Handle contact button click based on authentication state
+  const handleContactClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    
+    if (isLoaded) {
+      if (isSignedIn) {
+        // User is signed in, navigate directly to messages
+        router.push('/messages');
+      } else {
+        // User is not signed in, show sign-in modal with return URL
+        router.push('/?showSignIn=true&returnTo=/messages');
+      }
+    }
+  };
 
   const socialLinks = [
     {
@@ -134,7 +153,8 @@ const HeroSection = () => {
                   View Experience
                 </a>
                 <a 
-                  href="#contact" 
+                  href="#" 
+                  onClick={handleContactClick}
                   className="bg-foreground/10 text-foreground px-6 py-2.5 rounded-md hover:bg-foreground/20 transition-colors border border-foreground/20"
                 >
                   Contact Me
