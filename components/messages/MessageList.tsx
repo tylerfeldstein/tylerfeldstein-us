@@ -18,12 +18,13 @@ interface MessageListProps {
 // Define the message structure based on the actual API response
 interface Message {
   _id: Id<"messages">;
+  chatId: Id<"chats">;
   sender: string;
   content: string;
   timestamp: number;
-  isRead: boolean;
-  isAdmin: boolean;
-  isSystemMessage: boolean;
+  read?: string[];
+  isAdmin?: boolean;
+  isSystemMessage?: boolean;
 }
 
 // Define participant info structure
@@ -38,8 +39,8 @@ interface ParticipantInfo {
 export function MessageList({ chatId }: MessageListProps) {
   const { user } = useUser();
   const { resolvedTheme } = useTheme();
-  const messagesQuery = useQuery(api.messages.getMessages, { chatId });
-  const messages = useMemo(() => messagesQuery || [], [messagesQuery]);
+  const messagesResult = useQuery(api.messages.getMessages, { chatId });
+  const messages = useMemo(() => messagesResult || [], [messagesResult]);
   const chatQuery = useQuery(api.messages.getChat, { chatId });
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -60,11 +61,30 @@ export function MessageList({ chatId }: MessageListProps) {
   // Log chat and message data for debugging
   useEffect(() => {
     if (chatId) {
-      console.log(`Rendering MessageList for chat: ${chatId}`);
-      console.log(`Messages loaded: ${messages.length}`);
-      console.log(`Chat data:`, chatQuery);
+      console.log(`[MessageList] Chat ID: ${chatId}`);
+      console.log(`[MessageList] Messages loaded: ${messages.length}`);
+      console.log(`[MessageList] Current user ID: ${user?.id}`);
+      console.log(`[MessageList] Is admin: ${isAdmin}`);
+      
+      if (messages.length === 0) {
+        console.log("[MessageList] No messages found for this chat");
+      } else {
+        // Log message sender details to debug issues
+        messages.slice(0, 3).forEach((msg: any, i: number) => {
+          console.log(`[MessageList] Message ${i+1}:`);
+          console.log(`  - ID: ${msg._id}`);
+          console.log(`  - Content: ${msg.content.substring(0, 30)}...`);
+          console.log(`  - Sender: ${msg.sender}`);
+          console.log(`  - Is from current user: ${msg.sender === user?.id}`);
+          console.log(`  - Timestamp: ${new Date(msg.timestamp).toLocaleString()}`);
+          
+          // Log participant info for this sender
+          const senderInfo = participantsInfo.find(p => p.clerkId === msg.sender);
+          console.log(`  - Sender info:`, senderInfo || 'Not found in participants');
+        });
+      }
     }
-  }, [chatId, messages.length, chatQuery]);
+  }, [chatId, messages, user?.id, participantsInfo, isAdmin]);
 
   if (!chatId) {
     return (
@@ -98,10 +118,17 @@ export function MessageList({ chatId }: MessageListProps) {
         <p className="text-xs text-muted-foreground text-center">Messages in this chat are private to participants only</p>
         {messages.map((message: Message) => {
           // Determine if this is the current user's message
-          const isUserMessage = message.sender === user?.id;
+          // Clerk's user ID might have a different prefix than the message sender ID
+          // Try to match the ID part after the last underscore if the full ID doesn't match
+          const isUserMessage = user?.id === message.sender || 
+                               (user?.id && message.sender && 
+                               user.id.split('_').pop() === message.sender.split('_').pop());
           
           // Determine if this is a system message and if admin is viewing it
-          const isSystemMessage = message.isSystemMessage;
+          const isSystemMessage = message.isSystemMessage || false;
+          
+          // Check if message is read by the current user
+          const isRead = message.read?.includes(user?.id || "");
           
           // For admin view, we want to treat system messages as if they were sent by the admin
           // so they appear on the right side but with a different color
@@ -112,7 +139,11 @@ export function MessageList({ chatId }: MessageListProps) {
           const formattedTime = format(messageDate, "h:mm a");
           
           // Find sender info in participantsInfo
-          const senderInfo = participantsInfo.find((p: ParticipantInfo) => p.clerkId === message.sender);
+          const senderInfo = participantsInfo.find((p: ParticipantInfo) => 
+            p.clerkId === message.sender ||
+            (p.clerkId && message.sender && 
+             p.clerkId.split('_').pop() === message.sender.split('_').pop())
+          );
           const senderName = isSystemMessage ? "Support" : (senderInfo?.name || senderInfo?.email || "User");
           const senderImage = isSystemMessage ? null : senderInfo?.imageUrl;
           const senderInitial = isSystemMessage ? "S" : senderName.charAt(0).toUpperCase();
@@ -182,7 +213,12 @@ export function MessageList({ chatId }: MessageListProps) {
                 >
                   <p className="whitespace-pre-wrap break-words">{message.content}</p>
                 </div>
-                <span className="text-xs text-muted-foreground mt-1">{formattedTime}</span>
+                <span className="text-xs text-muted-foreground mt-1">
+                  {formattedTime}
+                  {!isUserMessage && isRead && (
+                    <span className="ml-2 text-[10px]">✓ Read</span>
+                  )}
+                </span>
               </div>
               
               {showOnRightSide && (

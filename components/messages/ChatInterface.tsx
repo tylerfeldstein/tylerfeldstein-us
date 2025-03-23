@@ -10,6 +10,7 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { useUser } from "@clerk/nextjs";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { NewChatModal } from "./NewChatModal";
 
 // Constants for sidebar width
 const DEFAULT_SIDEBAR_WIDTH = 350; // Default width in pixels
@@ -23,11 +24,27 @@ export function ChatInterface() {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [selectedChatId, setSelectedChatId] = useState<Id<"chats"> | null>(null);
+  const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
   const previousChatIdRef = useRef<Id<"chats"> | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   
   // Get chats for the current user
   const chats = useQuery(api.messages.listChats) || [];
+  
+  // Get current user data to check if they're an admin
+  const currentUser = useQuery(api.users.getMe);
+  const isAdmin = currentUser?.role === "admin";
+  
+  // Add debugging for chat loading
+  useEffect(() => {
+    console.log(`[ChatInterface] Loaded ${chats.length} chats`);
+    if (chats.length > 0) {
+      console.log(`[ChatInterface] First chat: ${chats[0]?._id}, name: ${chats[0]?.name}`);
+      if (chats[0]?.participantIds) {
+        console.log(`[ChatInterface] First chat participants: ${chats[0]?.participantIds.length}`);
+      }
+    }
+  }, [chats]);
   
   // Load sidebar width and expanded state from localStorage on mount
   useEffect(() => {
@@ -87,28 +104,45 @@ export function ChatInterface() {
     }
   }, [selectedChatId, user, markAsRead]);
   
-  // Create a new chat
+  // Create a chat directly for regular users or show modal for admins
   const createChat = useMutation(api.messages.createChat);
   
   const handleNewChat = async () => {
+    // For admin users, show the modal to select participants
+    if (isAdmin) {
+      setIsNewChatModalOpen(true);
+      return;
+    }
+    
+    // For regular users, create a chat directly
     if (!user) return;
     
     try {
       const newChatId = await createChat({
         name: "New Chat",
         initialMessage: "Hello! How can I help you today?",
+        participantIds: [], // Add empty array for participantIds
       });
       
       setSelectedChatId(newChatId);
       
-      // On mobile, close sidebar when starting new chat
+      // On mobile, close sidebar when creating new chat
       if (window.innerWidth < 768) {
         setIsSidebarOpen(false);
       }
     } catch (error) {
       console.error("Failed to create chat:", error);
-      // Show error to user
       alert("Failed to create chat. Please try again.");
+    }
+  };
+  
+  // Handle chat creation via the modal (admins only)
+  const handleChatCreated = (chatId: Id<"chats">) => {
+    setSelectedChatId(chatId);
+    
+    // On mobile, close sidebar when creating new chat
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
     }
   };
   
@@ -248,6 +282,18 @@ export function ChatInterface() {
           </div>
         )}
       </div>
+
+      {/* New Chat Modal */}
+      <NewChatModal
+        open={isNewChatModalOpen}
+        onClose={() => {
+          setIsNewChatModalOpen(false);
+          // Refresh chats list after modal closes
+          setTimeout(() => {
+            console.log("[ChatInterface] Refreshing chats after modal close");
+          }, 500);
+        }}
+      />
     </div>
   );
 } 

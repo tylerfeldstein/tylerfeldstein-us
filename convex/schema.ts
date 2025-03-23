@@ -38,13 +38,14 @@ export default defineSchema({
   // Chat schemas
   chats: defineTable({
     name: v.string(),
-    participants: v.array(v.string()), // Array of user IDs
+    participantIds: v.array(v.string()), // Array of user IDs
     createdBy: v.string(), // User ID of the creator
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_participant", ["participants"])
-    .index("by_createdBy", ["createdBy"]),
+    .index("by_participants", ["participantIds"])
+    .index("by_createdBy", ["createdBy"])
+    .index("by_createdAt", ["createdAt"]),
   
   messages: defineTable({
     chatId: v.id("chats"),
