@@ -1,6 +1,8 @@
 "use client";
 
 import React from 'react';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 
 // Social media links component
 const FollowOnSocial = () => {
@@ -21,6 +23,24 @@ const FollowOnSocial = () => {
 };
 
 const CtaSection = () => {
+  const { isSignedIn, isLoaded } = useUser();
+  const router = useRouter();
+  
+  // Handle contact button click based on authentication state
+  const handleContactClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    
+    if (isLoaded) {
+      if (isSignedIn) {
+        // User is signed in, navigate directly to messages
+        router.push('/messages');
+      } else {
+        // User is not signed in, show sign-in modal with return URL
+        router.push('/?showSignIn=true&returnTo=/messages');
+      }
+    }
+  };
+
   return (
     <section className="bg-background dark:bg-gradient-to-b from-background/95 to-background/70 py-16 sm:py-20 border-t border-border">
       <div className="container px-4 md:px-6 mx-auto">
@@ -36,6 +56,14 @@ const CtaSection = () => {
               and CI/CD pipelines. I also build AI agents and workflows to enhance security operations 
               and incident response capabilities.
             </p>
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <button 
+                onClick={handleContactClick}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2.5 rounded-md transition-colors text-center"
+              >
+                Contact Me
+              </button>
+            </div>
             <div className="mt-8">
               <h3 className="text-xl font-semibold mb-3 text-foreground">
                 Follow me
