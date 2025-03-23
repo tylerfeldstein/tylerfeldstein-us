@@ -8,6 +8,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useUser } from "@clerk/nextjs";
 
 interface MessageInputProps {
   chatId: Id<"chats">;
@@ -18,9 +19,10 @@ export function MessageInput({ chatId }: MessageInputProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { resolvedTheme } = useTheme();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { user } = useUser();
 
-  const sendMessage = useMutation(api.messages.sendMessage);
-  const setTypingStatus = useMutation(api.messages.setTypingStatus);
+  const sendMessage = useMutation(api.secureMessages.sendMessageSecure);
+  const setTypingStatus = useMutation(api.secureMessages.setTypingStatusSecure);
 
   // Auto resize textarea
   useEffect(() => {
@@ -33,24 +35,44 @@ export function MessageInput({ chatId }: MessageInputProps) {
 
   // Update typing status
   useEffect(() => {
-    // Skip the effect if chatId is null
-    if (!chatId) return;
+    // Skip the effect if chatId is null or no user
+    if (!chatId || !user) return;
     
     let typingTimeout: NodeJS.Timeout;
     
     if (message.trim()) {
-      setTypingStatus({ chatId, isTyping: true });
+      setTypingStatus({ 
+        chatId, 
+        isTyping: true,
+        tokenPayload: {
+          userId: user.id,
+          userRole: "user", // This will be overridden by server-side check
+          exp: 0, // These will be filled by server
+          iat: 0,
+          jti: "" // This will be filled by server
+        }
+      });
       
       // Clear the typing status after 2 seconds of no input
       typingTimeout = setTimeout(() => {
-        setTypingStatus({ chatId, isTyping: false });
+        setTypingStatus({ 
+          chatId, 
+          isTyping: false,
+          tokenPayload: {
+            userId: user.id,
+            userRole: "user", // This will be overridden by server-side check
+            exp: 0, // These will be filled by server
+            iat: 0,
+            jti: "" // This will be filled by server
+          }
+        });
       }, 2000);
     }
     
     return () => {
       if (typingTimeout) clearTimeout(typingTimeout);
     };
-  }, [message, chatId, setTypingStatus]);
+  }, [message, chatId, setTypingStatus, user]);
 
   // If no chat is selected, don't render the input
   if (!chatId) {
@@ -64,7 +86,23 @@ export function MessageInput({ chatId }: MessageInputProps) {
     
     try {
       setIsSubmitting(true);
-      await sendMessage({ chatId, content: message });
+      const result = await sendMessage({ 
+        chatId, 
+        content: message,
+        tokenPayload: {
+          userId: user?.id || "",
+          userRole: "user", // This will be overridden by server-side check
+          exp: 0, // These will be filled by server
+          iat: 0,
+          jti: "" // This will be filled by server
+        }
+      });
+      
+      if (result.error) {
+        console.error("Failed to send message:", result.error);
+        return;
+      }
+      
       setMessage("");
     } catch (error) {
       console.error("Failed to send message:", error);

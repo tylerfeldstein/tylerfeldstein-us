@@ -178,21 +178,10 @@ export const getMe = query({
 /**
  * Get a user by their Clerk ID
  */
-export const getUserByClerkId = query({
+export const getUserById = query({
   args: {
     clerkId: v.string(),
   },
-  returns: v.union(
-    v.object({
-      _id: v.id("users"),
-      clerkId: v.string(),
-      email: v.optional(v.string()),
-      name: v.optional(v.string()),
-      imageUrl: v.optional(v.string()),
-      role: v.optional(v.string()),
-    }),
-    v.null()
-  ),
   handler: async (ctx, args) => {
     const user = await ctx.db
       .query("users")

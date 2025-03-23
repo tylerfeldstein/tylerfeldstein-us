@@ -169,3 +169,105 @@ This approach uses native Next.js 15 features, avoiding API routes for better pe
 ## License
 
 Dont steal my shit
+
+# Secure Chat with HTTP-Only Cookies
+
+> **Note**: This is the current implementation for secure chat authentication. We've transitioned from the previous localStorage-based approach to this more secure HTTP-only cookie system.
+
+This project implements a secure chat system using JWT tokens stored in HTTP-only cookies for enhanced security.
+
+## Security Features
+
+- **HTTP-Only Cookies**: Prevents client-side JavaScript from accessing token values
+- **Short-Lived Access Tokens**: Access tokens expire quickly to minimize security risks
+- **Refresh Token Rotation**: Longer-lived refresh tokens enable seamless re-authentication
+- **Server-Side Token Verification**: Token validation happens on the server
+
+## Implementation
+
+The implementation consists of:
+
+1. **Server Actions** (`/actions/auth/cookieTokens.ts`):
+   - Set and clear HTTP-only cookies
+   - Refresh access tokens using refresh tokens
+   - Get token existence status safely
+
+2. **React Hook** (`/hooks/useChatCookieTokens.ts`):
+   - Client-side interface to the cookie token system
+   - Manages token generation, refreshing, and clearing
+   - Tracks token status for UI updates
+
+3. **Convex Functions** (`/convex/jwt.ts`):
+   - Generate and verify JWT tokens
+   - Store token information in database
+   - Enable token invalidation
+
+## Usage
+
+### In Client Components
+
+```tsx
+'use client';
+
+import { useChatCookieTokens } from "@/hooks/useChatCookieTokens";
+
+export default function ChatComponent() {
+  const { 
+    hasToken, 
+    isRefreshing, 
+    generateChatTokens, 
+    refreshToken, 
+    clearTokens 
+  } = useChatCookieTokens();
+
+  // Generate tokens on chat access
+  const handleChatAccess = async () => {
+    const success = await generateChatTokens();
+    if (success) {
+      // Navigate to chat or load chat data
+    }
+  };
+
+  // Clear tokens on logout
+  const handleLogout = async () => {
+    await clearTokens();
+    // Navigate to login page
+  };
+
+  return (
+    <div>
+      <button onClick={handleChatAccess}>Access Chat</button>
+      <button onClick={handleLogout}>Logout</button>
+    </div>
+  );
+}
+```
+
+### In Server Components or Actions
+
+```tsx
+import { getTokensForServerUse } from "@/actions/auth/cookieTokens";
+
+export async function YourServerAction() {
+  // Get tokens for server-side API calls
+  const { accessToken, refreshToken } = await getTokensForServerUse();
+  
+  if (accessToken) {
+    // Make authenticated API call with token
+  } else {
+    // Handle unauthenticated state
+  }
+}
+```
+
+## Security Benefits
+
+- Prevents XSS attacks from stealing tokens
+- Reduces risk of CSRF attacks when proper configurations are applied
+- Automatically expires tokens to limit attack window
+- Maintains better security in development environments
+
+## Development vs Production
+
+- Development: Cookies work without HTTPS
+- Production: Adds `secure: true` flag to ensure cookies only work over HTTPS

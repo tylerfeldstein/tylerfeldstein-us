@@ -70,13 +70,28 @@ export default defineSchema({
     .index("by_chatId_userId", ["chatId", "userId"]),
     
   // Telegram thread mappings
-  telegramThreadMappings: defineTable({
-    chatId: v.id("chats"),
-    telegramThreadId: v.number(),
-    telegramAdminId: v.string(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
+  // telegramThreadMappings: defineTable({
+  //   chatId: v.id("chats"),
+  //   telegramThreadId: v.number(),
+  //   telegramAdminId: v.string(),
+  //   createdAt: v.number(),
+  //   updatedAt: v.number(),
+  // })
+  //   .index("by_chatId", ["chatId"])
+  //   .index("by_telegramThreadId", ["telegramThreadId"]),
+    
+  // Chat access tokens table
+  chatTokens: defineTable({
+    userId: v.string(), // User ID
+    tokenId: v.string(), // JWT ID
+    refreshTokenId: v.string(), // Refresh token ID
+    issuedAt: v.number(), // Timestamp
+    expiresAt: v.number(), // Timestamp
+    refreshExpiresAt: v.number(), // Timestamp
+    isInvalidated: v.boolean() // Whether token has been revoked
   })
-    .index("by_chatId", ["chatId"])
-    .index("by_telegramThreadId", ["telegramThreadId"]),
+    .index("by_userId", ["userId"])
+    .index("by_tokenId", ["tokenId"])
+    .index("by_refreshTokenId", ["refreshTokenId"])
+    .index("by_userId_isInvalidated", ["userId", "isInvalidated"]),
 });

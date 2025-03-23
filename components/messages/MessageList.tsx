@@ -40,8 +40,17 @@ interface ParticipantInfo {
 export function MessageList({ chatId }: MessageListProps) {
   const { user } = useUser();
   const { resolvedTheme } = useTheme();
-  const messagesResult = useQuery(api.messages.getMessages, { chatId });
-  const messages = useMemo(() => messagesResult || [], [messagesResult]);
+  const messagesResult = useQuery(api.secureMessages.getMessagesSecure, { 
+    chatId,
+    tokenPayload: {
+      userId: user?.id || "",
+      userRole: "user", // This will be overridden by server-side check
+      exp: 0, // These will be filled by server
+      iat: 0,
+      jti: "" // This will be filled by server
+    }
+  });
+  const messages = useMemo(() => messagesResult?.messages || [], [messagesResult]);
   const chatQuery = useQuery(api.messages.getChat, { chatId });
   const scrollRef = useRef<HTMLDivElement>(null);
   
@@ -71,7 +80,7 @@ export function MessageList({ chatId }: MessageListProps) {
         console.log("[MessageList] No messages found for this chat");
       } else {
         // Log message sender details to debug issues
-        messages.slice(0, 3).forEach((msg: any, i: number) => {
+        messages.slice(0, 3).forEach((msg: Message, i: number) => {
           console.log(`[MessageList] Message ${i+1}:`);
           console.log(`  - ID: ${msg._id}`);
           console.log(`  - Content: ${msg.content.substring(0, 30)}...`);
@@ -80,7 +89,7 @@ export function MessageList({ chatId }: MessageListProps) {
           console.log(`  - Timestamp: ${new Date(msg.timestamp).toLocaleString()}`);
           
           // Log participant info for this sender
-          const senderInfo = participantsInfo.find(p => p.clerkId === msg.sender);
+          const senderInfo = participantsInfo.find((p: ParticipantInfo) => p.clerkId === msg.sender);
           console.log(`  - Sender info:`, senderInfo || 'Not found in participants');
         });
       }
@@ -163,7 +172,7 @@ export function MessageList({ chatId }: MessageListProps) {
           } else if (isAdminMessage) {
             // For admin messages, try to get the name from multiple sources
             const adminName = senderInfo?.name || 
-                      participantsInfo.find(p => p.role === "admin")?.name ||
+                      participantsInfo.find((p: ParticipantInfo) => p.role === "admin")?.name ||
                       currentUser?.name ||
                       "Admin";
             console.log("[MessageDisplay] Found admin name:", adminName);
