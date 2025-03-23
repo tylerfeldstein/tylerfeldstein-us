@@ -5,8 +5,8 @@ import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
-import ShadcnNavbar from "@/components/ShadcnNavbar";
-import SmoothScrolling from "@/components/SmoothScrolling";
+import { ClerkAuthSync } from "@/components/clerk-auth-sync";
+import LayoutWrapper from "@/components/layout-wrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -55,6 +55,9 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Root layout that provides authentication and theming
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -75,12 +78,11 @@ export default function RootLayout({
         >
           <ClerkProvider>
             <ConvexClientProvider>
-              <ShadcnNavbar/>
-              <SmoothScrolling>
-                <div className="pt-16 w-full flex flex-col items-center justify-center overflow-x-hidden">
-                  {children}
-                </div>
-              </SmoothScrolling>
+              {/* This component syncs Clerk user data to the Convex database */}
+              <ClerkAuthSync />
+              
+              <LayoutWrapper>{children}</LayoutWrapper>
+              
               <Toaster />
             </ConvexClientProvider>
           </ClerkProvider>

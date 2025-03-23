@@ -10,7 +10,7 @@ import { api } from "@/convex/_generated/api";
 import { SignUpButton } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
 import { useUser } from "@clerk/nextjs";
-import { triggerHelloWorld } from "../actions/inngest";
+import { triggerHelloWorld } from "@/actions/inngest";
 import { useInngestRealtime } from "@/hooks/useInngestRealtime";
 import { InngestTraceView, createTraceFromJobResult } from "@/components/InngestTraceView";
 import { Metadata } from "next";

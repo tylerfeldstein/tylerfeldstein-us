@@ -20,4 +20,51 @@ export default defineSchema({
   }).index("by_eventId", ["eventId"])
     .index("by_function", ["function"])
     .index("by_correlationId", ["correlationId"]),
+  
+  // Users table for Clerk authentication
+  users: defineTable({
+    clerkId: v.string(), // The Clerk user ID
+    email: v.optional(v.string()),
+    name: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
+    role: v.optional(v.string()), // User role: "user" or "admin" - optional for backward compatibility
+    lastLoginAt: v.number(), // Timestamp of last login
+    createdAt: v.number(), // Timestamp of user creation
+    // Add any other user fields you need here
+  }).index("by_clerkId", ["clerkId"])
+    .index("by_email", ["email"])
+    .index("by_role", ["role"]),
+  
+  // Chat schemas
+  chats: defineTable({
+    name: v.string(),
+    participants: v.array(v.string()), // Array of user IDs
+    createdBy: v.string(), // User ID of the creator
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_participant", ["participants"])
+    .index("by_createdBy", ["createdBy"]),
+  
+  messages: defineTable({
+    chatId: v.id("chats"),
+    content: v.string(),
+    sender: v.string(), // User ID of sender
+    timestamp: v.number(),
+    read: v.optional(v.array(v.string())), // Array of user IDs who have read this message
+    isAdmin: v.optional(v.boolean()), // Flag to identify admin messages
+    isSystemMessage: v.optional(v.boolean()), // Flag to identify placeholder/system messages
+  })
+    .index("by_chatId", ["chatId"])
+    .index("by_chatId_timestamp", ["chatId", "timestamp"]),
+
+  // Typing status table
+  typingStatus: defineTable({
+    chatId: v.id("chats"),
+    userId: v.string(), // User ID who is typing
+    isTyping: v.boolean(),
+    lastUpdated: v.number(), // Timestamp of last update
+  })
+    .index("by_chatId", ["chatId"])
+    .index("by_chatId_userId", ["chatId", "userId"]),
 });
