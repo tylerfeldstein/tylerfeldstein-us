@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { SendIcon, PaperclipIcon } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Send, Paperclip, Loader2, Smile } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -9,6 +9,9 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useUser } from "@clerk/nextjs";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface MessageInputProps {
   chatId: Id<"chats">;
@@ -111,24 +114,33 @@ export function MessageInput({ chatId }: MessageInputProps) {
     }
   };
 
+  const isDarkTheme = resolvedTheme === "dark";
+
   return (
-    <div className="absolute bottom-0 left-0 right-0">
-      <div className={`px-4 md:px-8 pb-6 ${
-        resolvedTheme === "dark" 
-          ? "bg-gradient-to-t from-black/50 via-black/20 to-transparent/20 backdrop-blur-sm" 
-          : "bg-gradient-to-t from-blue-50/80 via-blue-50/40 to-transparent backdrop-blur-lg"
-      }`}>
-        <div className="max-w-3xl mx-auto">
+    <div className="absolute bottom-0 left-0 right-0 w-full">
+      <div className={cn(
+        "px-2 sm:px-4 md:px-8 pb-4 md:pb-6 pt-10",
+        "bg-gradient-to-t",
+        isDarkTheme 
+          ? "from-[#1a0920]/90 via-[#220a2a]/70 to-transparent" 
+          : "from-blue-50/90 via-blue-50/70 to-transparent"
+      )}>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+          className="max-w-3xl w-full mx-auto"
+        >
           <form 
             onSubmit={handleSubmit}
-            className={`
-              relative rounded-xl border shadow-sm overflow-hidden
-              ${resolvedTheme === "dark" 
-                ? "border-white/30 bg-black/50 backdrop-blur-md" 
-                : "border-blue-200 bg-white/80 backdrop-blur-md"
-              }
-              transition-all duration-300
-            `}
+            className={cn(
+              "relative rounded-2xl overflow-hidden shadow-lg transition-all duration-300",
+              "border backdrop-blur-md",
+              isDarkTheme 
+                ? "border-slate-700/50 bg-slate-900/70 shadow-slate-900/20" 
+                : "border-blue-200 bg-white/90 shadow-blue-100/50",
+              message.trim() ? "ring-2 ring-primary/20" : ""
+            )}
           >
             <Textarea
               ref={textareaRef}
@@ -140,63 +152,113 @@ export function MessageInput({ chatId }: MessageInputProps) {
                   handleSubmit(e);
                 }
               }}
-              placeholder="Ask anything..."
-              className={`
-                min-h-[52px] resize-none px-4 py-3 pr-14 
-                border-0 shadow-none focus-visible:ring-0
-                ${resolvedTheme === "dark" 
-                  ? "bg-transparent text-white/90 placeholder:text-gray-400" 
-                  : "bg-transparent text-gray-900 placeholder:text-gray-500"
-                }
-                text-sm md:text-base
-              `}
+              placeholder="Type your message here..."
+              className={cn(
+                "min-h-[56px] md:min-h-[60px] resize-none p-3 sm:p-4 pr-20 sm:pr-24",
+                "border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                "placeholder:text-muted-foreground/60",
+                isDarkTheme 
+                  ? "bg-transparent text-white/90" 
+                  : "bg-transparent text-gray-900",
+                "text-sm md:text-base transition-colors"
+              )}
             />
             
-            <div className="absolute right-2 bottom-2 flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className={`
-                  h-8 w-8 rounded-md 
-                  ${resolvedTheme === "dark" 
-                    ? "text-gray-400 hover:bg-[#202123]/30 hover:text-gray-300" 
-                    : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                  }
-                `}
-              >
-                <PaperclipIcon className="h-4 w-4" />
-                <span className="sr-only">Attach file</span>
-              </Button>
+            <div className="absolute right-1 sm:right-2 bottom-1 sm:bottom-2 flex items-center gap-1 sm:gap-1.5">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-colors",
+                        isDarkTheme 
+                          ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" 
+                          : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                      )}
+                    >
+                      <Smile className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="sr-only">Add emoji</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">Add emoji (coming soon)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               
-              <Button 
-                type="submit" 
-                variant={message.trim() ? "default" : "ghost"}
-                size="icon" 
-                className={`
-                  h-8 w-8 rounded-md
-                  ${!message.trim() ? 'opacity-50 cursor-not-allowed' : ''}
-                  ${resolvedTheme === "dark" && message.trim() 
-                    ? "bg-primary hover:bg-primary/90" 
-                    : resolvedTheme === "dark" 
-                      ? "text-gray-400 hover:bg-[#202123]/30 hover:text-gray-300" 
-                      : message.trim() 
-                        ? "bg-primary hover:bg-primary/90" 
-                        : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                  }
-                `}
-                disabled={!message.trim() || isSubmitting}
-              >
-                <SendIcon className="h-4 w-4" />
-                <span className="sr-only">Send</span>
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-colors",
+                        isDarkTheme 
+                          ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" 
+                          : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                      )}
+                    >
+                      <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="sr-only">Attach file</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p className="text-xs">Attach file (coming soon)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <AnimatePresence mode="wait">
+                {isSubmitting ? (
+                  <motion.div
+                    key="loading"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    className="h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center"
+                  >
+                    <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin text-primary" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="button"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                  >
+                    <Button 
+                      type="submit" 
+                      size="icon" 
+                      className={cn(
+                        "h-9 w-9 sm:h-10 sm:w-10 rounded-xl shadow-sm",
+                        !message.trim() && "opacity-50 cursor-not-allowed"
+                      )}
+                      disabled={!message.trim() || isSubmitting}
+                    >
+                      <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="sr-only">Send</span>
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </form>
           
-          <div className="mt-2 text-[10px] text-center text-muted-foreground">
-            Chat Developed By Tyler Feldstein.
+          <div className="mt-2 text-[10px] text-center text-muted-foreground/70">
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              Chat Developed By Tyler Feldstein
+            </motion.span>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

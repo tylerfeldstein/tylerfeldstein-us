@@ -7,6 +7,10 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useEffect, useState } from "react";
 import { useChatCookieTokens } from "@/hooks/useChatCookieTokens";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
+import { LoadingScreen } from "@/components/loaders/LoadingScreen";
 
 export default function MessagesPage() {
   const { isSignedIn, isLoaded } = useUser();
@@ -18,6 +22,11 @@ export default function MessagesPage() {
   const { hasToken, generateChatTokens, isRefreshing, refreshError } = useChatCookieTokens();
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
+  const [showError, setShowError] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState(0);
+  
+  // Loading state for essential data or initial token check
+  const isInitialLoading = !isLoaded || currentUser === undefined || hasToken === null;
   
   // Handle token generation when user is authenticated but has no token
   useEffect(() => {
@@ -44,74 +53,147 @@ export default function MessagesPage() {
     generateTokenIfNeeded();
   }, [isLoaded, isSignedIn, currentUser, hasToken, isGeneratingToken, generateChatTokens]);
   
+  // Cycle through loading messages for a better UX
+  useEffect(() => {
+    if (isGeneratingToken || (tokenError || refreshError) && !showError) {
+      const interval = setInterval(() => {
+        setLoadingPhase(prev => (prev + 1) % 3);
+      }, 2500);
+      return () => clearInterval(interval);
+    }
+  }, [isGeneratingToken, tokenError, refreshError, showError]);
+  
+  // Add a delay before showing the error to prevent flash
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    if (tokenError || refreshError) {
+      // Show error after a delay to prevent flashing
+      timeoutId = setTimeout(() => {
+        setShowError(true);
+      }, 1000);
+    } else {
+      setShowError(false);
+    }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [tokenError, refreshError]);
+  
   // Redirect to home if not authenticated
   if (isLoaded && !isSignedIn) {
     router.push("/");
     return null;
   }
   
-  // Show loading state only when we're still loading essential data
-  if (!isLoaded || currentUser === undefined) {
+  // Loading messages for different phases
+  const loadingMessages = [
+    "Processing secure token...",
+    "Setting up encrypted chat...",
+    "Finalizing secure connection..."
+  ];
+  
+  // Only handle errors and token generation in the page component - loading handled by layout
+  
+  // Show error state ONLY if token generation explicitly failed and after delay
+  if ((tokenError || refreshError) && showError) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="animate-spin h-6 w-6 border-2 border-gray-500 rounded-full border-t-transparent"></div>
-          <p className="text-sm text-muted-foreground">Loading secure chat...</p>
-        </div>
+      <div className="flex h-full w-full items-center justify-center p-4">
+        <LoadingScreen 
+          message={tokenError || refreshError || "Authentication error occurred"} 
+          title="Authentication Error"
+          description="Unable to access secure messaging"
+          icon="shield"
+          footerText="Please try again or contact support"
+          footerIcon="lock"
+          speed={0.9}
+          fullScreen={false}
+          customButton={
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => router.push("/")}
+                variant="outline"
+                className="text-xs"
+                size="sm"
+              >
+                Return Home
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowError(false);
+                  generateChatTokens();
+                }}
+                size="sm"
+                className="text-xs"
+              >
+                Try Again
+              </Button>
+            </div>
+          }
+        />
       </div>
     );
   }
   
-  // Show error state if token generation failed
-  if (tokenError || refreshError) {
+  // Show loading for token generation only since initial loading is handled by layout
+  if (isGeneratingToken || (tokenError || refreshError) && !showError) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-4 max-w-md text-center p-6 border border-red-200 rounded-lg bg-red-50">
-          <div className="text-red-500 text-xl">⚠️</div>
-          <h2 className="text-lg font-semibold">Secure Chat Authentication Error</h2>
-          <p className="text-sm text-muted-foreground">{tokenError || refreshError}</p>
-          <button 
-            onClick={() => router.push("/")}
-            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors text-sm"
-          >
-            Return to Home
-          </button>
-        </div>
+      <div className="h-full w-full flex items-center justify-center p-4">
+        <LoadingScreen 
+          message={loadingMessages[loadingPhase]} 
+          description="Setting up your secure session token"
+          icon="key"
+          footerIcon="lock"
+          footerText="Encrypting your connection"
+          speed={0.7}
+          phase={loadingPhase}
+          fullScreen={false}
+        />
       </div>
     );
   }
   
-  // Show loading state only during initial token generation
-  if (isGeneratingToken) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="animate-spin h-6 w-6 border-2 border-gray-500 rounded-full border-t-transparent"></div>
-          <p className="text-sm text-muted-foreground">Setting up secure chat connection...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // If we have a token and we're not refreshing, show the chat interface
-  // Note: We allow the interface to show during refresh to prevent flicker
+  // If we have a token, show the chat interface
   if (hasToken) {
-    return <ChatInterface />;
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key="chat-interface"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="h-full w-full flex"
+        >
+          <ChatInterface />
+        </motion.div>
+      </AnimatePresence>
+    );
   }
   
-  // If we don't have a token and we're not generating one, show a retry button
+  // If we don't have a token and we're not generating one, show a retry button with LoadingScreen
   return (
-    <div className="flex h-screen items-center justify-center">
-      <div className="flex flex-col items-center gap-4 max-w-md text-center p-6">
-        <h2 className="text-lg font-semibold">Unable to Access Secure Chat</h2>
-        <p className="text-sm text-muted-foreground">Please try refreshing your session.</p>
-        <button 
-          onClick={() => generateChatTokens()}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm"
-        >
-          Refresh Session
-        </button>
-      </div>
+    <div className="h-full w-full flex items-center justify-center p-4">
+      <LoadingScreen 
+        message="Your secure session token could not be generated. Please try refreshing your session."
+        title="Chat Session Error"
+        description="Unable to access secure messaging"
+        icon="shield"
+        footerText="Session token required"
+        footerIcon="lock"
+        speed={0.9}
+        fullScreen={false}
+        customButton={
+          <Button 
+            onClick={() => generateChatTokens()}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span>Refresh Session</span>
+          </Button>
+        }
+      />
     </div>
   );
 } 

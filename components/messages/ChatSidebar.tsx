@@ -114,7 +114,7 @@ export function ChatSidebar({
                 key={chat._id}
                 variant={selectedChatId === chat._id ? "secondary" : "ghost"}
                 className={cn(
-                  "w-full justify-start relative", 
+                  "w-full justify-start relative group", 
                   selectedChatId === chat._id && resolvedTheme === "light" 
                     ? "bg-blue-50 hover:bg-blue-100 text-blue-800" 
                     : "",
@@ -131,11 +131,42 @@ export function ChatSidebar({
                   }
                 }}
               >
+                {/* Display avatar of the other participant or admin */}
                 <Avatar className={isExpanded ? "mr-2 h-8 w-8" : "h-8 w-8"}>
-                  <AvatarImage src={chat.participantsInfo?.[0]?.imageUrl || user.imageUrl} />
-                  <AvatarFallback>
-                    {(chat.participantsInfo?.[0]?.name?.[0] || user.firstName?.[0] || "U").toUpperCase()}
-                  </AvatarFallback>
+                  {(() => {
+                    // Find the other participant (not the current user)
+                    const otherParticipant = chat.participantsInfo?.find(
+                      (p: ParticipantInfo) => p && p.clerkId !== user.id
+                    );
+                    
+                    // Find admin participant as fallback
+                    const adminParticipant = chat.participantsInfo?.find(
+                      (p: ParticipantInfo) => p && p.role === "admin"
+                    );
+                    
+                    // Determine which avatar and fallback to use
+                    let avatarUrl = "";
+                    let fallbackInitial = "C";
+                    
+                    if (otherParticipant) {
+                      avatarUrl = otherParticipant.imageUrl || "";
+                      fallbackInitial = (otherParticipant.name?.[0] || 
+                                      otherParticipant.email?.[0] || "C").toUpperCase();
+                    } else if (adminParticipant) {
+                      avatarUrl = adminParticipant.imageUrl || "";
+                      fallbackInitial = (adminParticipant.name?.[0] || 
+                                      adminParticipant.email?.[0] || "S").toUpperCase();
+                    }
+                    
+                    return (
+                      <>
+                        <AvatarImage src={avatarUrl} />
+                        <AvatarFallback className="bg-primary text-primary-foreground">
+                          {fallbackInitial}
+                        </AvatarFallback>
+                      </>
+                    );
+                  })()}
                 </Avatar>
                 
                 {isExpanded && (
@@ -146,58 +177,33 @@ export function ChatSidebar({
                         console.log(`[ChatSidebar] Processing chat ${chat._id}, name: ${chat.name}`);
                         console.log(`[ChatSidebar] Chat has ${chat.participantsInfo?.length || 0} participants info`);
                         
-                        // Check if we have last message info
-                        if (chat.lastMessageContent) {
-                          console.log(`[ChatSidebar] Chat has last message: ${chat.lastMessageContent.substring(0, 20)}...`);
+                        // Priority 1: Find other participant (not current user)
+                        if (chat.participantsInfo && chat.participantsInfo.length > 0) {
+                          // Find the other participant (not the current user)
+                          const otherParticipant = chat.participantsInfo.find(
+                            (p: ParticipantInfo) => p && p.clerkId !== user.id
+                          );
                           
-                          // First priority: always show admin name if a message exists
-                          if (chat.participantsInfo) {
-                            // Deep debug for participantsInfo
-                            console.log(`[ChatSidebar] Detailed participantsInfo:`, JSON.stringify(chat.participantsInfo));
-                            
-                            // Try to find admin in participants
-                            const adminParticipant = chat.participantsInfo.find((p: ParticipantInfo) => p && p.role === "admin");
-                            if (adminParticipant) {
-                              console.log(`[ChatSidebar] Found admin participant:`, adminParticipant);
-                              return adminParticipant.name || adminParticipant.email || "Support";
-                            } else {
-                              console.log(`[ChatSidebar] No admin found in participants for chat ${chat._id}`);
-                            }
+                          // If we found another participant, use their info
+                          if (otherParticipant) {
+                            console.log(`[ChatSidebar] Found other participant:`, otherParticipant);
+                            return otherParticipant.name || otherParticipant.email || "Chat";
                           }
                           
-                          // If this chat has messages but we don't have a good name yet, call it "Support Chat"
-                          return "Support Chat";
-                        }
-                        
-                        // Check if chat has participants
-                        if (chat.participantsInfo && chat.participantsInfo.length > 0) {
-                          // First look for admin users in participants
-                          const adminParticipant = chat.participantsInfo.find((p: ParticipantInfo) => p && p.role === "admin");
+                          // Priority 2: Look for admin user in participants
+                          const adminParticipant = chat.participantsInfo.find(
+                            (p: ParticipantInfo) => p && p.role === "admin"
+                          );
+                          
                           if (adminParticipant) {
-                            console.log(`[ChatSidebar] Found admin participant in participantsInfo:`, adminParticipant);
+                            console.log(`[ChatSidebar] Found admin participant:`, adminParticipant);
                             return adminParticipant.name || adminParticipant.email || "Support";
                           }
-
-                          // For 1:1 chats, show the other person's name
-                          if (chat.participantsInfo.length === 1) {
-                            const participant = chat.participantsInfo[0];
-                            return participant?.name || 
-                                   participant?.email || 
-                                   "Unknown User";
-                          }
-                          // For group chats, show first two names + count
-                          else if (chat.participantsInfo.length > 1) {
-                            const names = chat.participantsInfo
-                              .filter((p: ParticipantInfo) => p) // Filter out null values
-                              .slice(0, 2)
-                              .map((p: ParticipantInfo) => p.name || p.email || "User")
-                              .join(", ");
-                            
-                            if (chat.participantsInfo.length > 2) {
-                              return `${names} +${chat.participantsInfo.length - 2}`;
-                            }
-                            return names;
-                          }
+                        }
+                        
+                        // Priority 3: Fall back to support or chat name
+                        if (chat.lastMessageContent) {
+                          return "Support Chat";
                         }
                         
                         // If this is not a "New Chat", use its name
@@ -211,14 +217,26 @@ export function ChatSidebar({
                     </span>
                     {/* Show last message preview */}
                     {chat.lastMessageContent && (
-                      <div className="text-xs text-muted-foreground truncate mt-0.5 flex justify-between">
+                      <div className={cn(
+                        "text-xs text-muted-foreground truncate mt-0.5 flex justify-between",
+                        "group-hover:text-foreground/90 group-hover:font-medium transition-colors",
+                        selectedChatId === chat._id 
+                          ? resolvedTheme === "dark"
+                            ? "text-foreground/80"
+                            : "text-foreground/90"
+                          : ""
+                      )}>
                         <span className="truncate max-w-[80%]">
                           {chat.lastMessageContent.length > 30
                             ? chat.lastMessageContent.substring(0, 27) + "..."
                             : chat.lastMessageContent}
                         </span>
                         {chat.lastMessageTimestamp && (
-                          <span className="text-[10px] tabular-nums">
+                          <span className={cn(
+                            "text-[10px] tabular-nums",
+                            "group-hover:text-foreground/80",
+                            selectedChatId === chat._id ? "text-foreground/70" : ""
+                          )}>
                             {formatTimestamp(chat.lastMessageTimestamp)}
                           </span>
                         )}

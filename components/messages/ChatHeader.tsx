@@ -1,17 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { forceLogout } from "@/actions/auth/cookieTokens";
-import { useChatCookieTokens } from "@/hooks/useChatCookieTokens";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 
 import {
   DropdownMenu,
@@ -26,10 +23,9 @@ import {
   MoreVertical as MoreVerticalIcon,
   UserPlus as UserPlusIcon,
   Trash2 as Trash2Icon,
-  MenuIcon,
   ArrowLeftIcon,
   Settings,
-  LogOut,
+  Info,
 } from "lucide-react";
 
 interface ParticipantInfo {
@@ -58,16 +54,44 @@ export function ChatHeader({
   isMobile 
 }: ChatHeaderProps) {
   const { user } = useUser();
-  const { signOut } = useClerk();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const { clearTokens } = useChatCookieTokens();
   
-  // Get chat details
+  // Get chat details and participants information
+  const chat = useQuery(api.messages.getChat, chatId ? { chatId } : "skip");
+  
+  // Get display name - prioritize showing the other participant's name
   let displayName = chatName;
-  if (!displayName) {
-    displayName = "New Message";
+  let avatarUrl = "";
+  let avatarFallback = "C";
+  
+  if (chat?.participantsInfo && chat.participantsInfo.length > 0) {
+    // Find the other participant (not the current user)
+    const otherParticipant = chat.participantsInfo.find(
+      (p: ParticipantInfo) => p && p.clerkId !== user?.id
+    );
+    
+    // Find admin participant as fallback
+    const adminParticipant = chat.participantsInfo.find(
+      (p: ParticipantInfo) => p && p.role === "admin"
+    );
+    
+    if (otherParticipant) {
+      // Use other participant's info
+      displayName = otherParticipant.name || otherParticipant.email || "Chat";
+      avatarUrl = otherParticipant.imageUrl || "";
+      avatarFallback = getInitials(displayName);
+    } else if (adminParticipant) {
+      // Fallback to admin's info
+      displayName = adminParticipant.name || adminParticipant.email || "Support";
+      avatarUrl = adminParticipant.imageUrl || "";
+      avatarFallback = getInitials(displayName);
+    }
+  }
+  
+  // If no participant info found, use chat name
+  if (!displayName || displayName === "New Chat") {
+    displayName = "Support Chat";
   }
   
   // Handle chat deletion
@@ -78,95 +102,52 @@ export function ChatHeader({
   };
   
   // Get initials for avatar fallback
-  const getInitials = (name: string): string => {
+  function getInitials(name: string): string {
     return name
       .split(" ")
       .map(part => part[0])
       .join("")
       .toUpperCase()
       .substring(0, 2);
-  };
-  
-  // Handle secure logout with JWT token invalidation
-  const handleSecureLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      // First clear the cookies from the client side
-      await clearTokens();
-      
-      // Then invalidate the tokens on the server
-      await forceLogout();
-      
-      // Finally, sign out from Clerk
-      await signOut();
-      
-      // Redirect to home
-      router.push('/');
-    } catch (error) {
-      console.error("Error during logout:", error);
-      // Try to sign out from Clerk anyway
-      try {
-        await signOut();
-      } catch (clerkError) {
-        console.error("Error signing out from Clerk:", clerkError);
-      }
-      router.push('/');
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
+  }
   
   return (
     <div className={cn(
-      "h-14 border-b flex items-center justify-between px-4 py-2",
-      resolvedTheme === "dark" ? "bg-zinc-950" : "bg-white"
+      "h-14 md:h-16 border-b flex items-center justify-between px-3 sm:px-4 py-2 sticky top-0 z-20 backdrop-blur-sm",
+      resolvedTheme === "dark" ? "bg-zinc-950/90" : "bg-white/90"
     )}>
       {/* Mobile back button */}
       {isMobile && (
-        <Button variant="ghost" size="icon" onClick={onBackClick} className="mr-2">
+        <Button variant="ghost" size="icon" onClick={onBackClick} className="mr-2 flex-shrink-0">
           <ArrowLeftIcon className="h-5 w-5" />
         </Button>
       )}
       
       {/* Chat info */}
-      <div className="flex items-center space-x-2">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={user?.imageUrl} alt={user?.fullName || "User"} />
-          <AvatarFallback>
-            {user?.fullName ? getInitials(user.fullName) : "U"}
+      <div className="flex items-center space-x-2 min-w-0 flex-1">
+        <Avatar className="h-8 w-8 flex-shrink-0">
+          <AvatarImage src={avatarUrl} alt={displayName} />
+          <AvatarFallback className="bg-primary text-primary-foreground">
+            {avatarFallback}
           </AvatarFallback>
         </Avatar>
-        <div>
-          <h2 className="text-sm font-semibold">{displayName}</h2>
-          <p className="text-xs text-muted-foreground">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm sm:text-base font-semibold truncate">{displayName}</h2>
+          <p className="text-xs text-muted-foreground truncate">
             {participantCount} participant{participantCount !== 1 ? "s" : ""}
           </p>
         </div>
       </div>
       
       {/* Chat actions */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={isLoggingOut}
-          onClick={handleSecureLogout}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          {isLoggingOut ? (
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          ) : (
-            <LogOut className="h-4 w-4" />
-          )}
-        </Button>
-        
+      <div className="flex items-center gap-0.5 sm:gap-2 flex-shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreVerticalIcon className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9">
+              <MoreVerticalIcon className="h-4 w-4 sm:h-5 sm:w-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Chat Options</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push("/settings")}>
@@ -177,17 +158,17 @@ export function ChatHeader({
               <UserPlusIcon className="mr-2 h-4 w-4" />
               <span>Add People</span>
             </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Info className="mr-2 h-4 w-4" />
+              <span>Chat Info</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem 
               className="text-destructive focus:text-destructive" 
               onClick={handleDeleteChat}
             >
               <Trash2Icon className="mr-2 h-4 w-4" />
               <span>Delete Chat</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSecureLogout} disabled={isLoggingOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              {isLoggingOut ? "Logging out..." : "Logout"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

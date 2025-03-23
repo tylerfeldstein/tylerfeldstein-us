@@ -81,7 +81,7 @@ export function ClerkAuthSync() {
           // unless the user changes or signs out and back in
           localStorage.setItem(SYNC_STATUS_KEY, user.id);
           
-          toast.success("User data synced successfully");
+          // toast.success("User data synced successfully");
         } else {
           console.error("ClerkAuthSync: Regular sync failed, trying force create:", result.error, result.details);
           
