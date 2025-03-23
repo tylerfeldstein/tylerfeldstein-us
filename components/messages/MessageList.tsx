@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useMemo, useState } from "react";
-import { useQuery } from "convex/react";
+import React, { useEffect, useRef, useMemo, useState, useCallback } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
@@ -15,6 +15,10 @@ import { CheckIcon, ClockIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PinWheel } from "@/components/loaders/pinwheel";
+import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
+import NewMessageIndicator from "./NewMessageIndicator";
+import TypingIndicator from "./TypingIndicator";
 
 interface MessageListProps {
   chatId: Id<"chats">;
@@ -42,6 +46,9 @@ interface ParticipantInfo {
   role?: string;
 }
 
+// Type for participants that can be null from the API
+type ParticipantInfoWithNull = ParticipantInfo | null;
+
 export function MessageList({ chatId }: MessageListProps) {
   const { user } = useUser();
   const { resolvedTheme } = useTheme();
@@ -55,11 +62,37 @@ export function MessageList({ chatId }: MessageListProps) {
       jti: "" // This will be filled by server
     }
   });
+  
+  // Fetch typing status
+  const typingStatus = useQuery(api.secureMessages.getTypingStatusSecure, chatId ? {
+    chatId,
+    tokenPayload: {
+      userId: user?.id || "",
+      userRole: "user", // This will be overridden by server-side check
+      exp: 0, // These will be filled by server
+      iat: 0,
+      jti: "" // This will be filled by server
+    }
+  } : "skip");
+  
+  // Mutation to mark messages as read
+  const markMessagesAsRead = useMutation(api.secureMessages.markMessagesAsReadSecure);
+
   const messages = useMemo(() => messagesResult?.messages || [], [messagesResult]);
   const chatQuery = useQuery(api.messages.getChat, { chatId });
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [typing, setTyping] = useState(false);
+  
+  // State to track if user has scrolled up and isn't at the bottom
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [hasNewUnreadMessages, setHasNewUnreadMessages] = useState(false);
+  
+  // Track the previous message count to detect new messages
+  const prevMessageCountRef = useRef(0);
+  
+  // Track when messages were last marked as read
+  const lastMarkAsReadRef = useRef(0);
   
   // Create a ref for the scroll container
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,8 +101,79 @@ export function MessageList({ chatId }: MessageListProps) {
   const scrollToBottom = ({ behavior = 'smooth' }: { behavior: ScrollBehavior }) => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior });
+      setIsAtBottom(true);
+      setHasNewUnreadMessages(false);
+      
+      // When scrolling to bottom, update the previous message count
+      // to prevent false "new messages" notifications
+      prevMessageCountRef.current = messages.length;
+      
+      // Mark messages as read when scrolling to bottom
+      markMessagesAsReadIfNeeded();
     }
   };
+
+  // Function to check if user is at bottom of chat
+  const checkIfAtBottom = useCallback(() => {
+    if (containerRef.current) {
+      // Look for the first direct child that has overflow-y-auto
+      const scrollableElement = containerRef.current.querySelector('.overflow-y-auto');
+      if (scrollableElement) {
+        const { scrollTop, scrollHeight, clientHeight } = scrollableElement as HTMLElement;
+        // Consider "at bottom" if within 100px of the bottom
+        const atBottom = scrollHeight - scrollTop - clientHeight < 100;
+        
+        // Only update state if the value has changed to avoid re-renders
+        if (atBottom !== isAtBottom) {
+          setIsAtBottom(atBottom);
+          
+          // If user manually scrolled to the bottom, clear the new messages notification
+          if (atBottom) {
+            setHasNewUnreadMessages(false);
+            
+            // Mark messages as read when user scrolls to bottom
+            markMessagesAsReadIfNeeded();
+          }
+        }
+        
+        return atBottom;
+      }
+    }
+    return true;
+  }, [isAtBottom]);
+  
+  // Function to mark messages as read, with debouncing
+  const markMessagesAsReadIfNeeded = useCallback(() => {
+    if (!chatId || !user?.id) return;
+    
+    // Debounce marking as read (don't mark more often than every 2 seconds)
+    const now = Date.now();
+    if (now - lastMarkAsReadRef.current < 2000) return;
+    
+    // Update last mark as read timestamp
+    lastMarkAsReadRef.current = now;
+    
+    // Call the mutation to mark messages as read
+    markMessagesAsRead({
+      chatId,
+      tokenPayload: {
+        userId: user.id,
+        userRole: "user", // This will be overridden by server-side check
+        exp: 0, // These will be filled by server
+        iat: 0,
+        jti: "" // This will be filled by server
+      }
+    }).then(() => {
+      console.log("[MessageList] Marked messages as read");
+    }).catch(error => {
+      console.error("[MessageList] Error marking messages as read:", error);
+    });
+  }, [chatId, user?.id, markMessagesAsRead]);
+  
+  // Handle scroll events to detect if user has scrolled up
+  const handleScroll = useCallback(() => {
+    checkIfAtBottom();
+  }, [checkIfAtBottom]);
   
   // Get participants info from the chat
   const participantsInfo = chatQuery?.participantsInfo || [];
@@ -78,13 +182,56 @@ export function MessageList({ chatId }: MessageListProps) {
   const currentUser = useQuery(api.users.getMe);
   const isAdmin = currentUser?.role === "admin";
   
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive, but only if user is already at the bottom
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: "smooth" });
+    // Only scroll automatically if there are messages and the user is already at the bottom
+    // We also need to ensure we're not scrolling on every render, only when new messages arrive
+    const messageCount = messages.length;
+    
+    if (messageCount > 0 && isAtBottom) {
+      // Use a small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        scrollToBottom({ behavior: "smooth" });
+        
+        // Mark messages as read when at bottom and new messages arrive
+        markMessagesAsReadIfNeeded();
+      }, 50);
+      return () => clearTimeout(timer);
+    } else if (messageCount > 0 && !isAtBottom) {
+      // Only set hasNewUnreadMessages if there are actually new messages (count increased)
+      if (messageCount > prevMessageCountRef.current) {
+        setHasNewUnreadMessages(true);
+      }
     }
-  }, [messages]);
+    
+    // Update the previous message count after checking
+    prevMessageCountRef.current = messageCount;
+  }, [messages.length, isAtBottom, markMessagesAsReadIfNeeded]);
   
+  // Mark messages as read when component mounts if at bottom
+  useEffect(() => {
+    if (chatId && isAtBottom && messages.length > 0) {
+      markMessagesAsReadIfNeeded();
+    }
+  }, [chatId, isAtBottom, messages.length, markMessagesAsReadIfNeeded]);
+  
+  // Auto-scroll when the component initially mounts with messages - only once on mount or when messages change
+  useEffect(() => {
+    // If this is the first time messages are loaded or messages have changed
+    if (messages.length > 0) {
+      // Add a small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        // Only scroll if we're already at the bottom or this is the first load
+        if (isAtBottom) {
+          scrollToBottom({
+            behavior: "auto" 
+          });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [chatId]);
+
   // Log chat and message data for debugging
   useEffect(() => {
     if (chatId) {
@@ -107,36 +254,11 @@ export function MessageList({ chatId }: MessageListProps) {
           
           // Log participant info for this sender
           const senderInfo = participantsInfo.find((p: ParticipantInfo) => p.clerkId === msg.sender);
-          console.log(`  - Sender info:`, senderInfo || 'Not found in participants');
+          console.log(`[MessageList] Sender info:`, senderInfo || 'Not found in participants');
         });
       }
     }
   }, [chatId, messages, user?.id, participantsInfo, isAdmin]);
-
-  // Get the last message for auto-scrolling
-  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
-
-  // Auto-scroll when new messages arrive or typing stops
-  useEffect(() => {
-    if (lastMessage && !typing) {
-      scrollToBottom({
-        behavior: "smooth"
-      });
-    }
-  }, [messages.length, lastMessage, typing]);
-
-  // Auto-scroll when the component initially mounts with messages
-  useEffect(() => {
-    // Add a small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      if (messages.length > 0) {
-        scrollToBottom({
-          behavior: "auto" 
-        });
-      }
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
 
   // Track loading state changes from query
   useEffect(() => {
@@ -146,22 +268,24 @@ export function MessageList({ chatId }: MessageListProps) {
   // Smoother message loading with a small delay to prevent scroll jumps
   useEffect(() => {
     if (isLoading && containerRef.current) {
-      const currentScroll = containerRef.current.scrollTop;
-      containerRef.current.style.overflow = 'hidden';
+      // Don't lock scrolling as it prevents manual scrolling
+      // Just store the current scroll position to restore it if needed
+      const scrollableElement = containerRef.current.querySelector('.overflow-y-auto');
+      const currentScroll = scrollableElement ? (scrollableElement as HTMLElement).scrollTop : 0;
       
       return () => {
-        if (containerRef.current) {
-          containerRef.current.style.overflow = 'auto';
-          // Restore scroll position after loading
-          setTimeout(() => {
-            if (containerRef.current) {
-              containerRef.current.scrollTop = currentScroll;
+        // After loading completes, try to maintain the scroll position
+        setTimeout(() => {
+          if (containerRef.current) {
+            const scrollableElement = containerRef.current.querySelector('.overflow-y-auto');
+            if (scrollableElement && !isAtBottom) {
+              (scrollableElement as HTMLElement).scrollTop = currentScroll;
             }
-          }, 50);
-        }
+          }
+        }, 50);
       };
     }
-  }, [isLoading]);
+  }, [isLoading, isAtBottom]);
 
   if (!chatId) {
     return (
@@ -195,6 +319,26 @@ export function MessageList({ chatId }: MessageListProps) {
       </div>
     );
   }
+  
+  // If chat not found or no longer exists
+  if (chatQuery === null) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="max-w-md p-6 bg-background/80 backdrop-blur-md border border-border/50 rounded-lg shadow-lg"
+        >
+          <h3 className="text-lg font-medium mb-2 text-destructive">Chat Not Available</h3>
+          <p className="text-muted-foreground mb-3">This chat may have been deleted or you no longer have access to it.</p>
+          <div className="px-4 py-3 rounded-lg bg-primary/5 border border-primary/10 mb-4">
+            <p className="text-xs text-muted-foreground">Try selecting another chat from the sidebar</p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (messages.length === 0) {
     return (
@@ -218,8 +362,14 @@ export function MessageList({ chatId }: MessageListProps) {
   }
 
   return (
-    <div className="flex-1 overflow-hidden" ref={containerRef}>
-      <ScrollArea className="h-full p-4 overflow-y-auto" scrollHideDelay={200}>
+    <div className="flex-1 overflow-hidden relative h-full" ref={containerRef}>
+      <div className="h-full overflow-y-auto p-4" 
+           onScroll={handleScroll} 
+           style={{
+             WebkitOverflowScrolling: 'touch', // Improve scroll performance on iOS
+             msOverflowStyle: 'none', // Hide scrollbar on IE/Edge
+             scrollbarWidth: 'thin', // Thin scrollbar on Firefox
+           }}>
         <div className="flex flex-col gap-6 pb-24">
           <div className="bg-primary/5 border border-primary/10 rounded-lg px-4 py-2 mb-2 text-center">
             <p className="text-xs text-muted-foreground">Messages in this chat are private to participants only</p>
@@ -253,32 +403,73 @@ export function MessageList({ chatId }: MessageListProps) {
               const fullDate = format(messageDate, "MMMM d, yyyy 'at' h:mm a");
               
               // Find sender info in participantsInfo
-              const senderInfo = message.senderInfo || participantsInfo.find((p: ParticipantInfo) => 
-                p.clerkId === message.sender ||
-                (p.clerkId && message.sender && 
-                p.clerkId.split('_').pop() === message.sender.split('_').pop())
+              const senderInfo = message.senderInfo || participantsInfo.find((p: ParticipantInfoWithNull) => 
+                p && (
+                  p.clerkId === message.sender ||
+                  (p.clerkId && message.sender && 
+                  p.clerkId.split('_').pop() === message.sender.split('_').pop())
+                )
               );
+
+              // Debug log for admin messages
+              if (message.isAdmin && !isSystemMessage) {
+                console.log(`[MessageList] Admin message from: ${message.sender}`);
+                console.log(`[MessageList] Admin senderInfo:`, senderInfo);
+                console.log(`[MessageList] All participants:`, participantsInfo);
+              }
 
               // Handle system messages vs user/admin messages
               let senderName;
               if (isSystemMessage) {
                 senderName = "Support";
               } else if (isAdminMessage) {
-                // For admin messages, try to get the name from multiple sources
-                const adminName = senderInfo?.name || 
-                          participantsInfo.find((p: ParticipantInfo) => p.role === "admin")?.name ||
-                          currentUser?.name ||
-                          "Admin";
-                senderName = adminName;
+                // For admin messages, try multiple sources to get the admin name
+                const adminInfo = senderInfo || participantsInfo.find((p: ParticipantInfoWithNull) => p && p.role === "admin");
+                senderName = adminInfo?.name || currentUser?.name || "Admin";
+                
+                // Log which source we're using for the admin name
+                if (senderInfo) {
+                  console.log(`[MessageList] Using direct senderInfo for admin name: ${senderName}`);
+                } else if (adminInfo) {
+                  console.log(`[MessageList] Using admin participant for name: ${senderName}`);
+                } else {
+                  console.log(`[MessageList] Using fallback name for admin: ${senderName}`);
+                }
               } else {
                 senderName = senderInfo?.name || senderInfo?.email || "User";
               }
               
-              const senderImage = isSystemMessage ? null : senderInfo?.imageUrl;
-              const senderInitial = isSystemMessage ? "S" : senderName.charAt(0).toUpperCase();
+              // Ensure we have the correct sender image
+              let senderImage = null;
+              if (isSystemMessage) {
+                senderImage = null; // System messages don't have images
+              } else if (isAdminMessage) {
+                // For admin messages, try to find an image from the admin user
+                const adminInfo = senderInfo || participantsInfo.find((p: ParticipantInfoWithNull) => p && p.role === "admin");
+                senderImage = adminInfo?.imageUrl || null;
+                
+                if (senderImage) {
+                  console.log(`[MessageList] Using admin image URL: ${senderImage}`);
+                }
+              } else {
+                // For regular user messages
+                senderImage = senderInfo?.imageUrl || null;
+              }
               
-              // Determine message position - right for current user messages AND system messages for admin view
-              const showOnRightSide = isUserMessage || isSupportMessageForAdmin;
+              // Define the initial for avatar fallback
+              const senderInitial = isSystemMessage 
+                ? "S" 
+                : isAdminMessage 
+                  ? (senderName?.charAt(0).toUpperCase() || "A")
+                  : (senderName?.charAt(0).toUpperCase() || "U");
+              
+              // Determine message position
+              // - User messages should show on the right
+              // - Admin messages should show on the right for the admin user
+              // - System messages should always appear on the left for users
+              // - System messages can appear on the right for admins only if they aren't marked as system messages
+              const showOnRightSide = (isUserMessage && !isSystemMessage) || 
+                                     (isAdminMessage && isAdmin);
 
               // Check if this is a new day compared to the previous message
               const showDateDivider = index === 0 || (
@@ -323,16 +514,21 @@ export function MessageList({ chatId }: MessageListProps) {
                       <div className="flex-shrink-0 mt-1">
                         <Avatar className="h-8 w-8 border shadow-sm">
                           {senderImage ? (
-                            <AvatarImage src={senderImage} alt={senderName} />
+                            // Show sender's avatar if available
+                            <AvatarImage src={senderImage} alt={senderName || "User"} />
+                          ) : isSystemMessage ? (
+                            // System message avatar - Support icon with special styling
+                            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-medium">
+                              S
+                            </AvatarFallback>
+                          ) : isAdminMessage ? (
+                            // Admin avatar fallback
+                            <AvatarFallback className="bg-destructive text-white font-medium">
+                              {senderInitial}
+                            </AvatarFallback>
                           ) : (
-                            <AvatarFallback className={cn(
-                              "text-white font-medium",
-                              isSystemMessage
-                                ? "bg-gradient-to-br from-indigo-500 to-purple-600" 
-                                : isAdminMessage 
-                                  ? "bg-destructive" 
-                                  : "bg-primary"
-                            )}>
+                            // Regular user fallback
+                            <AvatarFallback className="bg-primary text-white font-medium">
                               {senderInitial}
                             </AvatarFallback>
                           )}
@@ -343,7 +539,14 @@ export function MessageList({ chatId }: MessageListProps) {
                     <div className={`flex flex-col max-w-[85%] ${showOnRightSide ? "items-end" : "items-start"}`}>
                       {!showOnRightSide && (
                         <span className="text-xs text-muted-foreground mb-1 flex items-center gap-1 px-1">
-                          {senderName}
+                          {isSystemMessage ? (
+                            <>
+                              <span>Support</span>
+                              <Badge variant="secondary" className="text-[10px] px-1 py-0.5 ml-1">
+                                System
+                              </Badge>
+                            </>
+                          ) : senderName}
                           {isAdminMessage && (
                             <Badge variant="destructive" className="text-[10px] px-1 py-0.5 ml-1">
                               Admin
@@ -363,17 +566,23 @@ export function MessageList({ chatId }: MessageListProps) {
                             <div
                               className={cn(
                                 "rounded-2xl px-4 py-2.5 shadow-sm group-hover:shadow-md transition-shadow",
-                                showOnRightSide
-                                  ? isSupportMessageForAdmin
-                                    ? resolvedTheme === "dark" 
-                                      ? "bg-purple-900/80 text-white" 
-                                      : "bg-indigo-400/90 text-white"
-                                    : resolvedTheme === "dark" 
-                                      ? "bg-[#0c84fe]/95 text-white" 
-                                      : "bg-[#0c84fe]/95 text-white"
-                                  : resolvedTheme === "dark" 
-                                    ? "bg-[#0c84fe]/95 text-white" 
-                                    : "bg-[#0c84fe]/95 text-white",
+                                isAdminMessage 
+                                  ? "bg-[#0084ff]/95 text-white" // Admin messages are always blue
+                                  : showOnRightSide
+                                    ? isSystemMessage
+                                      ? resolvedTheme === "dark" 
+                                        ? "bg-indigo-700/95 text-white" 
+                                        : "bg-indigo-500/95 text-white"
+                                      : resolvedTheme === "dark" 
+                                        ? "bg-[#0084ff]/95 text-white" 
+                                        : "bg-[#0084ff]/95 text-white"
+                                    : isSystemMessage
+                                      ? resolvedTheme === "dark"
+                                        ? "bg-indigo-800/95 text-white"
+                                        : "bg-indigo-600/95 text-white"
+                                      : resolvedTheme === "dark" 
+                                        ? "bg-[#303030]/95 text-white" 
+                                        : "bg-[#e9e9eb]/95 text-black",
                                 showOnRightSide ? "rounded-tr-none" : "rounded-tl-none"
                               )}
                             >
@@ -405,9 +614,19 @@ export function MessageList({ chatId }: MessageListProps) {
                     {showOnRightSide && (
                       <div className="flex-shrink-0 mt-1">
                         <Avatar className="h-8 w-8 border shadow-sm">
-                          {senderImage ? (
-                            <AvatarImage src={senderImage} alt={senderName} />
+                          {isUserMessage && user?.imageUrl ? (
+                            // Current user's avatar for messages sent by them
+                            <AvatarImage src={user.imageUrl} alt={user.fullName || "You"} />
+                          ) : isSystemMessage ? (
+                            // Support/system message avatar
+                            <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-medium">
+                              S
+                            </AvatarFallback>
+                          ) : isAdminMessage && senderImage ? (
+                            // Admin's avatar if available
+                            <AvatarImage src={senderImage} alt={senderName || "Admin"} />
                           ) : (
+                            // Fallback avatar with appropriate styling
                             <AvatarFallback className={cn(
                               "text-white font-medium",
                               isSystemMessage
@@ -416,7 +635,7 @@ export function MessageList({ chatId }: MessageListProps) {
                                   ? "bg-destructive" 
                                   : "bg-primary"
                             )}>
-                              {senderInitial}
+                              {isUserMessage ? (user?.fullName?.[0] || "Y").toUpperCase() : senderInitial}
                             </AvatarFallback>
                           )}
                         </Avatar>
@@ -428,8 +647,33 @@ export function MessageList({ chatId }: MessageListProps) {
             })}
           </AnimatePresence>
           <div ref={scrollRef} />
+          
+          {/* Typing indicator */}
+          <AnimatePresence>
+            {typingStatus && 
+             !typingStatus.error && 
+             typingStatus.typingUsers && 
+             typingStatus.typingUsers.length > 0 && (
+              <TypingIndicator 
+                users={typingStatus.typingUsers.filter(Boolean) as any} 
+                className="absolute bottom-20 left-4" 
+              />
+            )}
+          </AnimatePresence>
         </div>
-      </ScrollArea>
+      </div>
+      
+      {/* New Messages Indicator with scroll to bottom button */}
+      <AnimatePresence>
+        {hasNewUnreadMessages && !isAtBottom && (
+          <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2">
+            <NewMessageIndicator
+              onClick={() => scrollToBottom({ behavior: "smooth" })}
+              variant="button"
+            />
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 } 

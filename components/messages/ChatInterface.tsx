@@ -9,7 +9,16 @@ import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { useUser } from "@clerk/nextjs";
-import { ChevronLeft, ChevronRight, MessageSquareIcon, MessageSquarePlus } from "lucide-react";
+import {
+  BarChart,
+  ChevronLeft,
+  ChevronRight,
+  MessageSquare,
+  MessageSquareIcon,
+  MessageSquarePlus,
+  Settings,
+  Users2,
+} from "lucide-react";
 import { NewChatModal } from "./NewChatModal";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -44,17 +53,40 @@ export function ChatInterface() {
     selectedChatId ? { chatId: selectedChatId } : "skip"
   );
   
-  // Check if the selected chat has been deleted
+  // Error state for chat query
+  const [chatError, setChatError] = useState<string | null>(null);
+  
+  // Check if the selected chat has been deleted or caused an error
   useEffect(() => {
+    // If the query is undefined, it's still loading
+    if (selectedChatId && selectedChat === undefined) {
+      // Still loading, reset any previous error
+      setChatError(null);
+      return;
+    }
+    
+    // If the query returned null and we have a selected chat ID, the chat doesn't exist
     if (selectedChatId && selectedChat === null) {
-      // Chat was deleted, reset the selection
       console.log(`[ChatInterface] Selected chat ${selectedChatId} no longer exists, resetting selection`);
-      setSelectedChatId(null);
+      setChatError("The selected chat has been deleted or is no longer accessible.");
       
       // If there are other chats available, select the first one
       if (chats.length > 0) {
-        setSelectedChatId(chats[0]._id);
+        const nextChat = chats.find(chat => chat._id !== selectedChatId);
+        if (nextChat) {
+          console.log(`[ChatInterface] Selecting next available chat: ${nextChat._id}`);
+          setSelectedChatId(nextChat._id);
+        } else {
+          // If no other chats exist, clear the selection
+          setSelectedChatId(null);
+        }
+      } else {
+        // No chats left
+        setSelectedChatId(null);
       }
+    } else {
+      // Chat exists, clear any previous error
+      setChatError(null);
     }
   }, [selectedChatId, selectedChat, chats]);
   
@@ -209,7 +241,11 @@ export function ChatInterface() {
     // Only allow resizing in expanded mode
     if (!isSidebarExpanded) return;
     
+    // Only prevent default for the specific resize handle touch event
+    // Don't block all touch events on the body
     e.preventDefault();
+    e.stopPropagation();
+    
     document.body.style.cursor = 'ew-resize';
     document.body.style.userSelect = 'none';
     
@@ -374,13 +410,57 @@ export function ChatInterface() {
                   onBackClick={() => setIsSidebarOpen(!isSidebarOpen)}
                   isMobile={!isSidebarOpen}
                 />
-                <div className="flex-1 overflow-hidden relative">
+                <div className="flex-1 overflow-hidden relative h-full">
                   <MessageList chatId={selectedChatId} />
                 </div>
                 <MessageInput chatId={selectedChatId} />
               </>
+            ) : chatError ? (
+              // Show error message when chat doesn't exist
+              <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+                <div className="max-w-md p-6 bg-background/80 backdrop-blur-md border border-border/50 rounded-lg shadow-lg">
+                  <h3 className="text-lg font-medium mb-2 text-primary">Chat Not Available</h3>
+                  <p className="text-muted-foreground mb-4">{chatError}</p>
+                  <Button 
+                    onClick={() => {
+                      // If there are chats, select the first one
+                      if (chats.length > 0) {
+                        setSelectedChatId(chats[0]._id);
+                      } else {
+                        // Otherwise, open the new chat modal
+                        setIsNewChatModalOpen(true);
+                      }
+                      // Clear the error
+                      setChatError(null);
+                    }}
+                    className="gap-2"
+                  >
+                    {chats.length > 0 ? (
+                      <>
+                        <MessageSquareIcon className="h-4 w-4" />
+                        <span>View Available Chats</span>
+                      </>
+                    ) : (
+                      <>
+                        <MessageSquarePlus className="h-4 w-4" />
+                        <span>Start New Chat</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             ) : (
-              <EmptyStateMessage onNewChat={handleNewChat} />
+              // Default view when no chat is selected
+              <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+                <div className="max-w-md">
+                  <h3 className="text-xl font-medium mb-2">Welcome to Messages</h3>
+                  <p className="text-muted-foreground mb-6">Select a conversation or start a new one</p>
+                  <Button onClick={handleNewChat} className="gap-2">
+                    <MessageSquarePlus className="h-4 w-4" />
+                    <span>New Message</span>
+                  </Button>
+                </div>
+              </div>
             )}
           </motion.div>
         </div>

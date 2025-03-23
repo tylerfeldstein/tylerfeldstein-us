@@ -113,8 +113,8 @@ export function ChatHeader({
   
   return (
     <div className={cn(
-      "h-14 md:h-16 border-b flex items-center justify-between px-3 sm:px-4 py-2 sticky top-0 z-20 backdrop-blur-sm",
-      resolvedTheme === "dark" ? "bg-zinc-950/90" : "bg-white/90"
+      "h-14 md:h-16 flex items-center justify-between px-3 sm:px-4 py-2 sticky top-0 z-20 backdrop-blur-sm",
+      resolvedTheme === "dark" ? "from-[#1a0920]/90 via-[#220a2a]/70 to-transparent" : "from-blue-50/90 via-blue-50/70 to-transparent0"
     )}>
       {/* Mobile back button */}
       {isMobile && (

@@ -12,6 +12,7 @@ import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 
 interface MessageInputProps {
   chatId: Id<"chats">;
@@ -44,23 +45,10 @@ export function MessageInput({ chatId }: MessageInputProps) {
     let typingTimeout: NodeJS.Timeout;
     
     if (message.trim()) {
-      setTypingStatus({ 
-        chatId, 
-        isTyping: true,
-        tokenPayload: {
-          userId: user.id,
-          userRole: "user", // This will be overridden by server-side check
-          exp: 0, // These will be filled by server
-          iat: 0,
-          jti: "" // This will be filled by server
-        }
-      });
-      
-      // Clear the typing status after 2 seconds of no input
-      typingTimeout = setTimeout(() => {
+      try {
         setTypingStatus({ 
           chatId, 
-          isTyping: false,
+          isTyping: true,
           tokenPayload: {
             userId: user.id,
             userRole: "user", // This will be overridden by server-side check
@@ -68,7 +56,34 @@ export function MessageInput({ chatId }: MessageInputProps) {
             iat: 0,
             jti: "" // This will be filled by server
           }
+        }).catch(err => {
+          // Silently handle errors for typing status to prevent UI disruption
+          console.error("Error setting typing status:", err);
         });
+      } catch (error) {
+        console.error("Error initiating typing status:", error);
+      }
+      
+      // Clear the typing status after 2 seconds of no input
+      typingTimeout = setTimeout(() => {
+        try {
+          setTypingStatus({ 
+            chatId, 
+            isTyping: false,
+            tokenPayload: {
+              userId: user.id,
+              userRole: "user", // This will be overridden by server-side check
+              exp: 0, // These will be filled by server
+              iat: 0,
+              jti: "" // This will be filled by server
+            }
+          }).catch(err => {
+            // Silently handle errors
+            console.error("Error clearing typing status:", err);
+          });
+        } catch (error) {
+          console.error("Error clearing typing status:", error);
+        }
       }, 2000);
     }
     
@@ -76,6 +91,46 @@ export function MessageInput({ chatId }: MessageInputProps) {
       if (typingTimeout) clearTimeout(typingTimeout);
     };
   }, [message, chatId, setTypingStatus, user]);
+  
+  // Cleanup typing status when component unmounts or chat changes
+  useEffect(() => {
+    // Skip if no chatId or user
+    if (!chatId || !user) return;
+    
+    // Cleanup function to clear typing status
+    const cleanup = () => {
+      try {
+        setTypingStatus({
+          chatId,
+          isTyping: false,
+          tokenPayload: {
+            userId: user.id,
+            userRole: "user",
+            exp: 0,
+            iat: 0,
+            jti: ""
+          }
+        }).catch(err => {
+          console.error("Error clearing typing status on cleanup:", err);
+        });
+      } catch (error) {
+        console.error("Error clearing typing status on cleanup:", error);
+      }
+    };
+    
+    // Add window beforeunload handler to clean up typing status when user leaves
+    const handleBeforeUnload = () => {
+      cleanup();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Clear typing status when component unmounts or chat changes
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      cleanup();
+    };
+  }, [chatId, user, setTypingStatus]);
 
   // If no chat is selected, don't render the input
   if (!chatId) {
@@ -89,6 +144,25 @@ export function MessageInput({ chatId }: MessageInputProps) {
     
     try {
       setIsSubmitting(true);
+      
+      // Clear typing status when sending a message
+      try {
+        await setTypingStatus({ 
+          chatId, 
+          isTyping: false,
+          tokenPayload: {
+            userId: user?.id || "",
+            userRole: "user", // This will be overridden by server-side check
+            exp: 0, // These will be filled by server
+            iat: 0,
+            jti: "" // This will be filled by server
+          }
+        });
+      } catch (error) {
+        console.error("Error clearing typing status:", error);
+        // Continue with message send even if typing status fails
+      }
+      
       const result = await sendMessage({ 
         chatId, 
         content: message,
@@ -103,12 +177,24 @@ export function MessageInput({ chatId }: MessageInputProps) {
       
       if (result.error) {
         console.error("Failed to send message:", result.error);
+        toast.error("Failed to send message. The chat may no longer be available.");
         return;
       }
       
       setMessage("");
     } catch (error) {
       console.error("Failed to send message:", error);
+      // Show user-friendly error message
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        const errorMessage = (error as Error).message;
+        if (errorMessage.includes("not found") || errorMessage.includes("Chat not found")) {
+          toast.error("This chat is no longer available. It may have been deleted.");
+        } else {
+          toast.error("Failed to send message. Please try again later.");
+        }
+      } else {
+        toast.error("Failed to send message. Please try again later.");
+      }
     } finally {
       setIsSubmitting(false);
     }

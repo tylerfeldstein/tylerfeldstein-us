@@ -7,6 +7,53 @@ import { auth } from "@clerk/nextjs/server";
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL || "";
 
 /**
+ * Server action to check if current user is an admin
+ * Returns boolean indicating admin status
+ */
+export async function isUserAdmin() {
+  const authObj = await auth();
+  const userId = authObj.userId;
+  
+  if (!userId) {
+    return false;
+  }
+  
+  try {
+    // Get a Convex token for the Clerk user
+    const convexToken = await authObj.getToken({ template: "convex" });
+    
+    if (!convexToken) {
+      return false;
+    }
+
+    // Call Convex API directly with fetch to get user data
+    const response = await fetch(`${CONVEX_URL}/api/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${convexToken}`
+      },
+      body: JSON.stringify({
+        path: "users:getMe",
+        args: {}
+      })
+    });
+    
+    if (!response.ok) {
+      return false;
+    }
+    
+    const userData = await response.json();
+    
+    // Check if the user has admin role
+    return userData.result?.role === "admin";
+  } catch (error) {
+    console.error("Error checking admin status:", error);
+    return false;
+  }
+}
+
+/**
  * Server action to get the current Convex user
  * Requires user to be authenticated with Clerk
  */

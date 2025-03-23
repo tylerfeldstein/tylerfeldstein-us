@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useTheme } from "next-themes";
 import { format, formatDistanceToNow, isToday, isYesterday } from "date-fns";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { isUserAdmin } from "@/actions/auth";
 
 import {
   BotIcon,
@@ -18,7 +19,9 @@ import {
   ArrowLeftIcon,
   ChevronDownIcon,
   MessageSquareIcon,
-  MessageSquarePlus
+  MessageSquarePlus,
+  PenIcon,
+  TrashIcon
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,9 +36,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import UnreadBadge from "./UnreadBadge";
+import NewMessageIndicator from "./NewMessageIndicator";
+import { toast } from "sonner";
 
-// Define participant info interface
+// Define participant info interface to handle optional nulls
 interface ParticipantInfo {
   clerkId: string;
   name?: string;
@@ -43,6 +66,9 @@ interface ParticipantInfo {
   imageUrl?: string;
   role?: string;
 }
+
+// Type for participants that can be null from the API
+type ParticipantInfoWithNull = ParticipantInfo | null;
 
 // Helper function to format timestamp like iPhone messages
 function formatTimestamp(timestamp: number): string {
@@ -78,13 +104,100 @@ export function ChatSidebar({
   sidebarWidth,
   isExpanded,
 }: ChatSidebarProps) {
-  const chats = useQuery(api.messages.listChats) || [];
   const { user } = useUser();
   const clerk = useClerk();
   const { resolvedTheme } = useTheme();
   
+  // Check admin status from server action
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  useEffect(() => {
+    // Check admin status using the server action
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      
+      try {
+        const adminStatus = await isUserAdmin();
+        setIsAdmin(adminStatus);
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdmin(false);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [user]);
+  
+  // Use secure chat listing to ensure admin access
+  const chats = useQuery(api.secureMessages.listChatsSecure, user ? {
+    tokenPayload: {
+      userId: user.id,
+      userRole: "user", // Server will check the actual role from the database
+      exp: 0, // These will be filled by server
+      iat: 0,
+      jti: "" // This will be filled by server
+    }
+  } : "skip") || [];
+  
   // Get unread messages across all chats
   const unreadMessages = useQuery(api.messages.getUnreadMessageCounts) || {};
+  
+  // Mutations for context menu actions
+  const deleteChat = useMutation(api.messages.deleteChat);
+  const renameChat = useMutation(api.messages.renameChat);
+  
+  // States for the rename dialog
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [chatToRename, setChatToRename] = useState<Id<"chats"> | null>(null);
+  const [newChatName, setNewChatName] = useState("");
+  
+  // States for delete confirmation
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<Id<"chats"> | null>(null);
+  
+  // Handle chat rename
+  const handleRenameChat = async () => {
+    if (!chatToRename || !newChatName.trim()) return;
+    
+    try {
+      await renameChat({ chatId: chatToRename, newName: newChatName.trim() });
+      toast.success("Chat renamed successfully");
+      setIsRenameDialogOpen(false);
+      setChatToRename(null);
+      setNewChatName("");
+    } catch (error) {
+      console.error("Error renaming chat:", error);
+      toast.error("Failed to rename chat");
+    }
+  };
+  
+  // Handle chat delete
+  const handleDeleteChat = async () => {
+    if (!chatToDelete) return;
+    
+    try {
+      await deleteChat({ chatId: chatToDelete });
+      // If we deleted the currently selected chat, clear the selection
+      if (selectedChatId === chatToDelete) {
+        if (chats.length > 1) {
+          // Find the next available chat
+          const nextChat = chats.find(chat => chat._id !== chatToDelete);
+          if (nextChat) {
+            setSelectedChatId(nextChat._id);
+          }
+        } else {
+          // No chats left
+          setSelectedChatId(null as unknown as Id<"chats">); // Type assertion to fix TypeScript error
+        }
+      }
+      toast.success("Chat deleted successfully");
+      setIsDeleteDialogOpen(false);
+      setChatToDelete(null);
+    } catch (error) {
+      console.error("Error deleting chat:", error);
+      toast.error("Failed to delete chat");
+    }
+  };
   
   if (!user) {
     return <div className="p-4">Please log in to access chats</div>;
@@ -110,145 +223,200 @@ export function ChatSidebar({
             const unreadCount = unreadMessages[chat._id] || 0;
             
             return (
-              <Button
-                key={chat._id}
-                variant={selectedChatId === chat._id ? "secondary" : "ghost"}
-                className={cn(
-                  "w-full justify-start relative group", 
-                  selectedChatId === chat._id && resolvedTheme === "light" 
-                    ? "bg-blue-50 hover:bg-blue-100 text-blue-800" 
-                    : "",
-                  isExpanded 
-                    ? "px-2 py-6" 
-                    : "flex-col p-0 h-12 w-12 justify-center items-center m-auto collapsed-avatar",
-                )}
-                onClick={() => {
-                  setSelectedChatId(chat._id);
-                  
-                  // On mobile, close sidebar after selecting chat
-                  if (window.innerWidth < 768) {
-                    setIsSidebarOpen(false);
-                  }
-                }}
-              >
-                {/* Display avatar of the other participant or admin */}
-                <Avatar className={isExpanded ? "mr-2 h-8 w-8" : "h-8 w-8"}>
-                  {(() => {
-                    // Find the other participant (not the current user)
-                    const otherParticipant = chat.participantsInfo?.find(
-                      (p: ParticipantInfo) => p && p.clerkId !== user.id
-                    );
-                    
-                    // Find admin participant as fallback
-                    const adminParticipant = chat.participantsInfo?.find(
-                      (p: ParticipantInfo) => p && p.role === "admin"
-                    );
-                    
-                    // Determine which avatar and fallback to use
-                    let avatarUrl = "";
-                    let fallbackInitial = "C";
-                    
-                    if (otherParticipant) {
-                      avatarUrl = otherParticipant.imageUrl || "";
-                      fallbackInitial = (otherParticipant.name?.[0] || 
-                                      otherParticipant.email?.[0] || "C").toUpperCase();
-                    } else if (adminParticipant) {
-                      avatarUrl = adminParticipant.imageUrl || "";
-                      fallbackInitial = (adminParticipant.name?.[0] || 
-                                      adminParticipant.email?.[0] || "S").toUpperCase();
-                    }
-                    
-                    return (
-                      <>
-                        <AvatarImage src={avatarUrl} />
-                        <AvatarFallback className="bg-primary text-primary-foreground">
-                          {fallbackInitial}
-                        </AvatarFallback>
-                      </>
-                    );
-                  })()}
-                </Avatar>
-                
-                {isExpanded && (
-                  <div className="flex-1 text-left truncate">
-                    <span className="inline-block max-w-[90%] truncate">
-                      {/* Format chat name like iOS Messages */}
+              <ContextMenu key={chat._id}>
+                <ContextMenuTrigger asChild>
+                  <Button
+                    variant={selectedChatId === chat._id ? "secondary" : "ghost"}
+                    className={cn(
+                      "w-full justify-start relative group", 
+                      selectedChatId === chat._id && resolvedTheme === "light" 
+                        ? "bg-blue-50 hover:bg-blue-100 text-blue-800" 
+                        : "",
+                      isExpanded 
+                        ? "px-2 py-6" 
+                        : "flex-col p-0 h-12 w-12 justify-center items-center m-auto collapsed-avatar",
+                    )}
+                    onClick={() => {
+                      setSelectedChatId(chat._id);
+                      
+                      // On mobile, close sidebar after selecting chat
+                      if (window.innerWidth < 768) {
+                        setIsSidebarOpen(false);
+                      }
+                    }}
+                  >
+                    {/* Display avatar of the other participant or admin */}
+                    <Avatar className={isExpanded ? "mr-2 h-8 w-8" : "h-8 w-8"}>
                       {(() => {
-                        console.log(`[ChatSidebar] Processing chat ${chat._id}, name: ${chat.name}`);
-                        console.log(`[ChatSidebar] Chat has ${chat.participantsInfo?.length || 0} participants info`);
+                        // Find the other participant (not the current user)
+                        const otherParticipant = chat.participantsInfo?.find(
+                          (p: ParticipantInfoWithNull) => p && p.clerkId !== user.id
+                        );
                         
-                        // Priority 1: Find other participant (not current user)
-                        if (chat.participantsInfo && chat.participantsInfo.length > 0) {
-                          // Find the other participant (not the current user)
-                          const otherParticipant = chat.participantsInfo.find(
-                            (p: ParticipantInfo) => p && p.clerkId !== user.id
-                          );
-                          
-                          // If we found another participant, use their info
-                          if (otherParticipant) {
-                            console.log(`[ChatSidebar] Found other participant:`, otherParticipant);
-                            return otherParticipant.name || otherParticipant.email || "Chat";
-                          }
-                          
-                          // Priority 2: Look for admin user in participants
-                          const adminParticipant = chat.participantsInfo.find(
-                            (p: ParticipantInfo) => p && p.role === "admin"
-                          );
-                          
-                          if (adminParticipant) {
-                            console.log(`[ChatSidebar] Found admin participant:`, adminParticipant);
-                            return adminParticipant.name || adminParticipant.email || "Support";
-                          }
+                        // Find admin participant as fallback
+                        const adminParticipant = chat.participantsInfo?.find(
+                          (p: ParticipantInfoWithNull) => p && p.role === "admin"
+                        );
+                        
+                        // Determine which avatar and fallback to use
+                        let avatarUrl = "";
+                        let fallbackInitial = "C";
+                        
+                        if (otherParticipant) {
+                          avatarUrl = otherParticipant.imageUrl || "";
+                          fallbackInitial = (otherParticipant.name?.[0] || 
+                                          otherParticipant.email?.[0] || "C").toUpperCase();
+                        } else if (adminParticipant) {
+                          avatarUrl = adminParticipant.imageUrl || "";
+                          fallbackInitial = (adminParticipant.name?.[0] || 
+                                          adminParticipant.email?.[0] || "S").toUpperCase();
                         }
                         
-                        // Priority 3: Fall back to support or chat name
-                        if (chat.lastMessageContent) {
-                          return "Support Chat";
-                        }
-                        
-                        // If this is not a "New Chat", use its name
-                        if (chat.name && chat.name !== "New Chat") {
-                          return chat.name;
-                        }
-                        
-                        // Default fallback
-                        return "New Message";
+                        return (
+                          <>
+                            <AvatarImage src={avatarUrl} />
+                            <AvatarFallback className="bg-primary text-primary-foreground">
+                              {fallbackInitial}
+                            </AvatarFallback>
+                          </>
+                        );
                       })()}
-                    </span>
-                    {/* Show last message preview */}
-                    {chat.lastMessageContent && (
-                      <div className={cn(
-                        "text-xs text-muted-foreground truncate mt-0.5 flex justify-between",
-                        "group-hover:text-foreground/90 group-hover:font-medium transition-colors",
-                        selectedChatId === chat._id 
-                          ? resolvedTheme === "dark"
-                            ? "text-foreground/80"
-                            : "text-foreground/90"
-                          : ""
-                      )}>
-                        <span className="truncate max-w-[80%]">
-                          {chat.lastMessageContent.length > 30
-                            ? chat.lastMessageContent.substring(0, 27) + "..."
-                            : chat.lastMessageContent}
+                    </Avatar>
+                    
+                    {isExpanded && (
+                      <div className="flex-1 text-left truncate">
+                        <span className="inline-block max-w-[90%] truncate">
+                          {(() => {
+                            console.log(`[ChatSidebar] Processing chat ${chat._id}, name: ${chat.name}`);
+                            console.log(`[ChatSidebar] Chat has ${chat.participantsInfo?.length || 0} participants info`);
+                            
+                            // Check if this is a new chat with only a system message
+                            const onlyHasCurrentUser = chat.participantsInfo?.length === 1 && 
+                              chat.participantsInfo[0]?.clerkId === user.id;
+                            
+                            const hasSystemMessageOnly = chat.lastMessageContent === "Hello! How can I help you today?";
+                            
+                            // Always show "New Chat" for chats with only the current user and a system message
+                            if (onlyHasCurrentUser && hasSystemMessageOnly) {
+                              console.log(`[ChatSidebar] Showing "New Chat" for chat with only system message`);
+                              return "New Chat";
+                            }
+                            
+                            // For admin view, prioritize showing participant name
+                            if (isAdmin) {
+                              // Find other participant (not current user)
+                              const otherParticipant = chat.participantsInfo?.find(
+                                (p: ParticipantInfoWithNull) => p && p.clerkId !== user.id
+                              );
+                              
+                              // If we found another participant, use their info
+                              if (otherParticipant) {
+                                console.log(`[ChatSidebar] Found other participant for admin view:`, otherParticipant);
+                                return otherParticipant.name || otherParticipant.email || "User";
+                              }
+                            }
+                            
+                            // For regular users, show chat name if available
+                            if (chat.name !== "New Chat") {
+                              return chat.name;
+                            }
+                            
+                            // Otherwise, use other participant's name/email
+                            const otherParticipant = chat.participantsInfo?.find(
+                              (p: ParticipantInfoWithNull) => p && p.clerkId !== user.id
+                            );
+                            
+                            if (otherParticipant) {
+                              return otherParticipant.name || otherParticipant.email || "User";
+                            }
+                            
+                            // Fallback to admin name if it exists
+                            const adminParticipant = chat.participantsInfo?.find(
+                              (p: ParticipantInfoWithNull) => p && p.role === "admin"
+                            );
+                            
+                            if (adminParticipant) {
+                              console.log(`[ChatSidebar] Found admin participant:`, adminParticipant);
+                              return adminParticipant.name || adminParticipant.email || "Support";
+                            }
+                            
+                            // Default fallback
+                            return "New Chat";
+                          })()}
                         </span>
-                        {chat.lastMessageTimestamp && (
-                          <span className={cn(
-                            "text-[10px] tabular-nums",
-                            "group-hover:text-foreground/80",
-                            selectedChatId === chat._id ? "text-foreground/70" : ""
+                        
+                        {/* Display chat name below user name for admins */}
+                        {isAdmin && chat.name && chat.name !== "New Chat" && (
+                          <div className="text-xs text-muted-foreground/70 truncate mt-0.5 mb-1">
+                            <span className="truncate max-w-[100%] italic">
+                              Chat: {chat.name}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Show last message preview */}
+                        {chat.lastMessageContent && (
+                          <div className={cn(
+                            "text-xs text-muted-foreground truncate mt-0.5 flex justify-between",
+                            "group-hover:text-foreground/90 group-hover:font-medium transition-colors",
+                            selectedChatId === chat._id 
+                              ? resolvedTheme === "dark"
+                                ? "text-foreground/80"
+                                : "text-foreground/90"
+                              : ""
                           )}>
-                            {formatTimestamp(chat.lastMessageTimestamp)}
-                          </span>
+                            <span className="truncate max-w-[80%]">
+                              {chat.lastMessageContent.length > 30
+                                ? chat.lastMessageContent.substring(0, 27) + "..."
+                                : chat.lastMessageContent}
+                            </span>
+                            {chat.lastMessageTimestamp && (
+                              <span className={cn(
+                                "text-[10px] tabular-nums",
+                                "group-hover:text-foreground/80",
+                                selectedChatId === chat._id ? "text-foreground/70" : ""
+                              )}>
+                                {formatTimestamp(chat.lastMessageTimestamp)}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
-                  </div>
-                )}
+                    
+                    {unreadCount > 0 && (
+                      <UnreadBadge count={unreadCount} expanded={isExpanded} />
+                    )}
+                  </Button>
+                </ContextMenuTrigger>
                 
-                {unreadCount > 0 && (
-                  <UnreadBadge count={unreadCount} expanded={isExpanded} />
-                )}
-              </Button>
+                <ContextMenuContent className="w-64">
+                  <ContextMenuItem
+                    onClick={() => {
+                      setChatToRename(chat._id);
+                      setNewChatName(chat.name || "");
+                      setIsRenameDialogOpen(true);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <PenIcon className="mr-2 h-4 w-4" />
+                    <span>Rename Chat</span>
+                  </ContextMenuItem>
+                  
+                  <ContextMenuSeparator />
+                  
+                  <ContextMenuItem
+                    onClick={() => {
+                      setChatToDelete(chat._id);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <TrashIcon className="mr-2 h-4 w-4" />
+                    <span>Delete Chat</span>
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             );
           })}
         </div>
@@ -318,6 +486,74 @@ export function ChatSidebar({
           )}
         </Button>
       </div>
+
+      {/* Rename Chat Dialog */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Rename Chat</DialogTitle>
+            <DialogDescription>
+              Enter a new name for this conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={newChatName}
+                onChange={(e) => setNewChatName(e.target.value)}
+                className="col-span-3"
+                placeholder="e.g., Project Discussion"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsRenameDialogOpen(false);
+                setChatToRename(null);
+                setNewChatName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleRenameChat} type="submit">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Chat Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Chat</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this chat? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setChatToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteChat}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 
