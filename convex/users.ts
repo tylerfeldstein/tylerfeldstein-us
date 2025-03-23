@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
+import { getAuth } from "./auth";
 
 /**
  * Create or update a user when they authenticate with Clerk
@@ -330,5 +331,86 @@ export const migrateUserRoles = mutation({
     
     // No updates needed
     return 0;
+  },
+});
+
+/**
+ * List all users for admin use only
+ * This is secured so only admins can access it
+ */
+export const listUsers = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.string(),
+      clerkId: v.string(),
+      name: v.optional(v.string()),
+      email: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
+      role: v.optional(v.string()),
+      createdAt: v.optional(v.number()),
+    })
+  ),
+  handler: async (ctx) => {
+    const auth = await getAuth(ctx);
+    if (!auth) throw new Error("Not authenticated");
+
+    const userId = auth.subject;
+    
+    // Get the current user to check if they are an admin
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .unique();
+    
+    // Verify the user is an admin, if not return empty list for security
+    if (!currentUser || currentUser.role !== "admin") {
+      console.warn(`Security alert: User ${userId} attempted to access listUsers without admin privileges`);
+      return [];
+    }
+    
+    // Fetch all users
+    const users = await ctx.db.query("users").collect();
+    
+    // Return sanitized user data
+    return users.map((user) => ({
+      _id: user._id,
+      clerkId: user.clerkId,
+      name: user.name,
+      email: user.email,
+      imageUrl: user.imageUrl,
+      role: user.role,
+      createdAt: user.createdAt,
+    }));
+  },
+});
+
+/**
+ * Get all users - admin only
+ */
+export const getAll = query({
+  handler: async (ctx) => {
+    const auth = await getAuth(ctx);
+    if (!auth) return [];
+
+    const userId = auth.subject;
+    
+    // Check if user is admin
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .unique();
+    
+    // Only admins can list all users
+    if (user?.role !== "admin") {
+      console.log("[getAll] Non-admin attempted to access all users:", userId);
+      return [];
+    }
+    
+    // For admins, return all users
+    const users = await ctx.db.query("users").collect();
+    console.log(`[getAll] Admin ${userId} retrieved ${users.length} users`);
+    
+    return users;
   },
 }); 
