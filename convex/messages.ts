@@ -690,99 +690,104 @@ export const getChat = query({
   args: {
     chatId: v.id("chats"),
   },
-  returns: v.object({
-    _id: v.id("chats"),
-    name: v.string(),
-    participantIds: v.array(v.string()),
-    participantsInfo: v.array(
-      v.object({
-        clerkId: v.string(),
-        name: v.optional(v.string()),
-        email: v.optional(v.string()),
-        imageUrl: v.optional(v.string()),
-        role: v.optional(v.string()),
-      })
-    ),
-    createdBy: v.string(),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }),
+  // Dynamically return either null or a chat object
+  returns: v.union(
+    v.null(),
+    v.object({
+      _id: v.id("chats"),
+      name: v.string(),
+      participantIds: v.array(v.string()),
+      participantsInfo: v.array(
+        v.object({
+          clerkId: v.string(),
+          name: v.optional(v.string()),
+          email: v.optional(v.string()),
+          imageUrl: v.optional(v.string()),
+          role: v.optional(v.string()),
+        })
+      ),
+      createdBy: v.string(),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+    })
+  ),
   handler: async (ctx, args) => {
-    const auth = await getAuth(ctx);
-    if (!auth) throw new Error("Not authenticated");
+    try {
+      const auth = await getAuth(ctx);
+      if (!auth) return null; // Return null instead of throwing an error
 
-    const userId = auth.subject;
-    
-    // Get user info to check role
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
-      .unique();
-    
-    // Verify chat exists
-    const chat = await ctx.db.get(args.chatId);
-    if (!chat) throw new Error("Chat not found");
-    
-    // Check if user is a participant or an admin with strict equality
-    const isParticipant = chat.participantIds.includes(userId);
-    const isCreator = chat.createdBy === userId;
-    const isAdmin = user?.role === "admin"; // Treat undefined role as non-admin
-    
-    if (!isParticipant && !isCreator && !isAdmin) {
-      console.warn(`SECURITY WARNING: User ${userId} attempted to access chat ${args.chatId} without permission`);
-      throw new Error("Access denied. You are not authorized to view this chat.");
-    }
-    
-    // Get all users for participants
-    const allUserDocs = await ctx.db
-      .query("users")
-      .collect();
-    
-    // Create a map of clerkId to user info for quick lookups
-    const userMap = new Map();
-    for (const u of allUserDocs) {
-      if (u.clerkId) {
-        userMap.set(u.clerkId, u);
+      const userId = auth.subject;
+      
+      // Get user info to check role
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+        .unique();
+      
+      // Verify chat exists
+      const chat = await ctx.db.get(args.chatId);
+      if (!chat) {
+        console.warn(`Chat not found: ${args.chatId}`);
+        return null; // Return null instead of throwing an error
       }
-    }
-    
-    // Get details for all participants
-    const participantsInfo = await Promise.all(
-      chat.participantIds.map(async (userId) => {
-        const user = await ctx.db
-          .query("users")
-          .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
-          .unique();
-        
-        if (user) {
-          return {
-            clerkId: user.clerkId,
-            name: user.name,
-            email: user.email,
-            imageUrl: user.imageUrl,
-            role: user.role,
-          };
+      
+      // Check if user is a participant or an admin with strict equality
+      const isParticipant = chat.participantIds.includes(userId);
+      const isCreator = chat.createdBy === userId;
+      const isAdmin = user?.role === "admin"; // Treat undefined role as non-admin
+      
+      if (!isParticipant && !isCreator && !isAdmin) {
+        console.warn(`SECURITY WARNING: User ${userId} attempted to access chat ${args.chatId} without permission`);
+        return null; // Return null instead of throwing an error
+      }
+      
+      // Get all users for participants
+      const allUserDocs = await ctx.db
+        .query("users")
+        .collect();
+      
+      // Create a map of clerkId to user info for quick lookups
+      const userMap = new Map();
+      for (const u of allUserDocs) {
+        if (u.clerkId) {
+          userMap.set(u.clerkId, u);
         }
-        
-        return {
-          clerkId: userId,
-          name: "Unknown User",
-          email: null,
-          imageUrl: null,
-          role: "user", // Default role for unknown users
-        };
-      })
-    );
-    
-    return {
-      _id: chat._id,
-      name: chat.name,
-      participantIds: chat.participantIds,
-      participantsInfo,
-      createdBy: chat.createdBy,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt || chat.createdAt,
-    };
+      }
+      
+      // Get details for all participants
+      const participantsInfo = await Promise.all(
+        chat.participantIds.map(async (userId) => {
+          const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+            .unique();
+          
+          if (user) {
+            return {
+              clerkId: user.clerkId,
+              name: user.name,
+              email: user.email,
+              imageUrl: user.imageUrl,
+              role: user.role,
+            };
+          }
+          return {
+            clerkId: userId,
+          };
+        })
+      );
+      
+      // Remove any system fields not in our validator
+      const { _creationTime, ...cleanChat } = chat;
+      
+      return {
+        ...cleanChat,
+        participantsInfo,
+      };
+    } catch (error) {
+      console.error(`Error in getChat: ${error}`);
+      return null; // Return null for any other errors
+    }
   },
 });
 
@@ -1272,5 +1277,53 @@ export const updateMessage = mutation({
     console.log(`[updateMessage] Admin ${userId} updated message ${args.messageId}`);
     
     return { success: true };
+  },
+});
+
+/**
+ * Rename a chat
+ */
+export const renameChat = mutation({
+  args: {
+    chatId: v.id("chats"),
+    newName: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const auth = await getAuth(ctx);
+    if (!auth) throw new Error("Authentication required");
+
+    const userId = auth.subject;
+    
+    // Get user info to check role
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", userId))
+      .unique();
+    
+    // Verify chat exists
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) throw new Error("Chat not found");
+    
+    // Check if user is the creator, a participant, or an admin
+    const isCreator = chat.createdBy === userId;
+    const isParticipant = chat.participantIds?.includes(userId) || false;
+    const isAdmin = user?.role === "admin"; // Treat undefined role as non-admin
+    
+    // For security, only participants, the creator, or admins can rename chats
+    if (!isCreator && !isParticipant && !isAdmin) {
+      console.warn(`Security warning: User ${userId} attempted to rename chat ${args.chatId} without being a participant`);
+      throw new Error("You can only rename chats you're part of");
+    }
+    
+    // Validate the new name
+    if (!args.newName.trim()) {
+      throw new Error("Chat name cannot be empty");
+    }
+    
+    // Update the chat with the new name
+    await ctx.db.patch(args.chatId, { name: args.newName });
+    
+    return true;
   },
 }); 
