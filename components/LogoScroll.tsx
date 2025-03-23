@@ -114,13 +114,15 @@ const LogoScroll = () => {
       name: "Everbridge",
       logo: (
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <Image 
-            src={isDarkMode && "/companies/everbridge_dark.svg" || "/companies/everbridge.png"} 
-            alt="Everbridge - Company where Tyler Feldstein applied AI security expertise" 
-            width={180} 
-            height={72} 
-            className="object-contain h-18 filter hover:drop-shadow-md" 
-          />
+          <div className="bg-white/70 p-4 rounded-md shadow-sm">
+            <Image 
+              src={isDarkMode ? "/companies/everbridge_dark.svg" : "/companies/everbridge.png"} 
+              alt="Everbridge - Company where Tyler Feldstein applied AI security expertise" 
+              width={180} 
+              height={72} 
+              className="object-contain h-18 filter hover:drop-shadow-md" 
+            />
+          </div>
         </div>
       )
     },
@@ -128,13 +130,15 @@ const LogoScroll = () => {
       name: "Warner Bros. Discovery",
       logo: (
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <Image 
-            src="/companies/Warner_Bros._Discovery.png" 
-            alt="Warner Bros. Discovery - Where Tyler Feldstein worked as a Cybersecurity Architect" 
-            width={180} 
-            height={72} 
-            className="object-contain h-18 filter hover:drop-shadow-md" 
-          />
+          <div className="bg-white/70 p-4 rounded-md shadow-sm">
+            <Image 
+              src="/companies/Warner_Bros._Discovery.png" 
+              alt="Warner Bros. Discovery - Where Tyler Feldstein worked as a Cybersecurity Architect" 
+              width={180} 
+              height={72} 
+              className={`object-contain h-18 filter hover:drop-shadow-md ${isDarkMode ? 'brightness-0 invert' : ''}`}
+            />
+          </div>
         </div>
       )
     },
@@ -142,13 +146,15 @@ const LogoScroll = () => {
       name: "CACI",
       logo: (
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <Image 
-            src={isDarkMode && "/companies/caci_dark.svg" || "/companies/caci.svg"} 
-            alt="CACI - Where Tyler Feldstein implemented AI security solutions" 
-            width={180} 
-            height={72} 
-            className="object-contain h-18 filter hover:drop-shadow-md" 
-          />
+          <div className="bg-white/70 p-4 rounded-md shadow-sm">
+            <Image 
+              src={isDarkMode ? "/companies/caci_dark.svg" : "/companies/caci.svg"} 
+              alt="CACI - Where Tyler Feldstein implemented AI security solutions" 
+              width={180} 
+              height={72} 
+              className="object-contain h-18 filter hover:drop-shadow-md" 
+            />
+          </div>
         </div>
       )
     },
@@ -156,13 +162,15 @@ const LogoScroll = () => {
       name: "T-Mobile",
       logo: (
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <Image 
-            src="/companies/tmobile.svg" 
-            alt="T-Mobile - Where Tyler Feldstein developed cloud security architecture" 
-            width={180} 
-            height={72} 
-            className="object-contain h-18 filter hover:drop-shadow-md" 
-          />
+          <div className="bg-white/70 p-4 rounded-md shadow-sm">
+            <Image 
+              src="/companies/tmobile.svg" 
+              alt="T-Mobile - Where Tyler Feldstein developed cloud security architecture" 
+              width={180} 
+              height={72} 
+              className={`object-contain h-18 filter hover:drop-shadow-md ${isDarkMode ? 'brightness-0 invert' : ''}`}
+            />
+          </div>
         </div>
       )
     },
@@ -170,13 +178,15 @@ const LogoScroll = () => {
       name: "US Army",
       logo: (
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <Image 
-            src="/companies/army.png" 
-            alt="US Army" 
-            width={180} 
-            height={72} 
-            className="object-contain h-18 filter hover:drop-shadow-md" 
-          />
+          <div className="bg-white/70 p-4 rounded-md shadow-sm">
+            <Image 
+              src="/companies/army.png" 
+              alt="US Army" 
+              width={180} 
+              height={72} 
+              className={`object-contain h-18 filter hover:drop-shadow-md ${isDarkMode ? 'brightness-0 invert' : ''}`}
+            />
+          </div>
         </div>
       )
     },
@@ -184,13 +194,15 @@ const LogoScroll = () => {
       name: "Department of Defense",
       logo: (
         <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <Image 
-            src="/companies/dod.png" 
-            alt="Department of Defense" 
-            width={180} 
-            height={72} 
-            className="object-contain h-18 filter hover:drop-shadow-md" 
-          />
+          <div className="bg-white/70 p-4 rounded-md shadow-sm">
+            <Image 
+              src="/companies/dod.png" 
+              alt="Department of Defense" 
+              width={180} 
+              height={72} 
+              className={`object-contain h-18 filter hover:drop-shadow-md ${isDarkMode ? 'brightness-0 invert' : ''}`}
+            />
+          </div>
         </div>
       )
     }

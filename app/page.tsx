@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function Home() {
   return (
-    <main className="overflow-hidden w-full main-gradient">
+    <main className="overflow-hidden w-full">
       {/* Handle sign-in modal */}
       <SignInModal />
       
