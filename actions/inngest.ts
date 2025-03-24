@@ -1,5 +1,5 @@
 "use server";
-import { inngest } from "@/inngest/client";
+import { inngest } from "@/inngest/utils/client";
 import { randomUUID } from 'crypto';
 import { subscribe } from "@inngest/realtime";
 
