@@ -137,3 +137,9 @@ To deploy your application:
 3. Configure environment variables on your hosting platform
 4. Deploy your Convex backend with `npx convex deploy`
 
+
+
+## simple agent chat
+```
+USE_LOCAL_LLM=true LOCAL_LLM_PROVIDER=lmstudio LOCAL_LLM_NAME=deepseek-r1-distill-qwen-14b LOCAL_LLM_URL=http://localhost:1234/v1/chat/completions npx tsx ./inngest/functions/AgenticChat/agentChat.ts
+```
