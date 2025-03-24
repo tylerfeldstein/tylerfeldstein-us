@@ -3,11 +3,6 @@ description: Inngest Quick Start Guide
 globs: 
 alwaysApply: false
 ---
----
-description: Inngest Quick Start Guide
-globs: "**/*inngest*/**"
-alwaysApply: false
----
 
 # Inngest Quick Start Guide
 
@@ -255,4 +250,4 @@ if (event.data.condition) {
     // Path if condition is false
   });
 }
-```
+``` 
