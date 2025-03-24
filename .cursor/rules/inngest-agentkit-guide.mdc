@@ -1,0 +1,679 @@
+---
+description: AgentKit Workflow Rules Guide
+globs: 
+alwaysApply: false
+---
+# Cursor AgentKit Workflow Rules Guide
+
+This guide provides rules and best practices for building **agentic workflows** using Inngest AgentKit in a Next.js 15 (TypeScript) application. We will cover how to create modular agents and tools, orchestrate multiple agents with networks and routers, integrate with Inngest functions for background processing, and support both local (dev) and cloud (prod) AI model providers. A step-by-step **multi-agent chatbot example** is included, demonstrating a Director agent delegating tasks to specialized agents (Research, Tech Support) and a Supervisor agent reviewing results. Finally, we discuss code organization, logging/debugging, and handling real-time vs. background execution. 
+
+**Table of Contents:**
+
+1. [Creating Agents with Inngest AgentKit](#creating-agents-with-inngest-agentkit)  
+2. [Defining Tools for Agents](#defining-tools-for-agents)  
+3. [Building Agent Networks and Routers](#building-agent-networks-and-routers)  
+4. [Shared State and Memory](#shared-state-and-memory)  
+5. [Modular and Reusable Agent Design](#modular-and-reusable-agent-design)  
+6. [Example: Multi-Agent Chatbot Workflow](#example-multi-agent-chatbot-workflow)  
+    - Director, Research, Tech Support, Supervisor agents  
+    - Tools (Brave search, Browser, etc.) and `callTool` usage  
+    - Orchestration via `AgentKit.createNetwork()`  
+7. [Integrating Agent Workflows with Inngest Functions](#integrating-agent-workflows-with-inngest-functions)  
+    - Triggering via Next.js server actions (events)  
+    - Connecting to Inngest `createFunction` and `serve()`  
+8. [Custom Model Provider Integration (Local vs. Cloud)](#custom-model-provider-integration-local-vs-cloud)  
+9. [Logging and Debugging Agents](#logging-and-debugging-agents)  
+10. [Real-Time Streaming vs. Background Jobs](#real-time-streaming-vs-background-jobs)  
+
+Throughout the guide, we use code snippets and references to official documentation for clarity. Let’s get started!
+
+## Creating Agents with Inngest AgentKit
+
+**Agents** are the core building blocks of an AgentKit workflow. An *Agent* encapsulates a specific goal or task and can utilize tools to fulfill that goal ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=Agents%20are%20the%20core%20of,used%20to%20accomplish%20a%20goal)). Agents are stateless (they don’t carry memory between runs) and typically represent one role or capability in your system (e.g. a “Researcher” agent or “Tech Support” agent). Each agent is defined with: 
+
+- A **name** (for identification and routing).
+- A **system prompt** (defining the agent’s persona/instructions).
+- An optional **description** (to help routing or debugging).
+- A **model** (the AI model or provider to use for this agent’s LLM calls).
+- An optional list of **tools** the agent can call.
+- Optional **lifecycle hooks** for custom behavior.
+
+Use the `createAgent()` function from AgentKit to define an agent ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=Creating%20an%20Agent)). At minimum, provide a name, system prompt, and a model. For example:
+
+```ts
+import { createAgent, openai } from "@inngest/agent-kit";
+
+const codeWriterAgent = createAgent({
+  name: "Code Writer",
+  system: "You are an expert TypeScript programmer...",  // system prompt defining behavior
+  model: openai({ model: "gpt-4" }),  // using OpenAI GPT-4 model for this agent
+});
+```
+
+In practice, design each agent to be **focused on a single responsibility**. For instance, you might have one agent whose job is researching information, another specialized in answering technical questions, etc. Keeping agents specialized makes them easier to **reuse** in different workflows and to maintain.
+
+**Best Practices for Agents:**
+
+- **Clear System Prompts:** Write a concise system prompt that **roles** the agent appropriately (e.g. *“You are a customer support specialist who helps users with technical issues.”*). This guides the model’s behavior.
+- **Stateless Design:** Don’t hard-code any persistent info in the agent. Rely on the network’s shared state for passing context (covered later), rather than adding long histories in the prompt.
+- **Assign Models Appropriately:** You can give each agent a different model if needed (for example, use a faster model for simple tasks and a more powerful one for complex tasks). If you don’t specify a model for an agent, the network’s default model will be used ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=import%20,kit)) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=const%20network%20%3D%20createNetwork%28,4o%27%20%7D%29%2C)). Each agent’s model can even come from different providers (OpenAI, Anthropic, etc.) in one network ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=Each%20Agent%20can%20specify%20it%E2%80%99s,to%20use%20an%20Anthropic%20model)) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=const%20summaryAgent%20%3D%20createAgent%28,sonnet%27%20%7D%29%2C)).
+- **Lifecycle Hooks:** Use `lifecycle` hooks (`onStart`, `onResponse`, `onFinish`, etc.) to inject custom logic. For example, `onStart` can modify the prompt at runtime (perhaps adding context from state) ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=lifecycle%3A%20,using%20Network%20state%20and%20history)) ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=import%20,kit)). These hooks are advanced but can be useful for debugging or adjusting behavior dynamically.
+
+Once an agent is created, you can test it in isolation by calling `agent.run(userInput)`. This will execute the agent’s prompt with the input and any tools, returning the result. In a multi-agent context, though, you will usually run agents via a **Network**, described below.
+
+## Defining Tools for Agents
+
+**Tools** extend an agent’s capabilities by allowing structured actions or function calls ([Tools - AgentKit by Inngest](https://agentkit.inngest.com/concepts/tools#:~:text=Tools%20are%20functions%20that%20extend,Tools%20have%20two%20core%20uses)). A tool is essentially a function the agent’s LLM can invoke (via function calling, etc.) to perform some operation or fetch data. Tools can do things like call APIs, query databases, run computations, or transform data. They also allow the agent to output structured results (e.g. returning JSON).
+
+Define a tool with `createTool({ name, description, parameters, handler })` ([Tools - AgentKit by Inngest](https://agentkit.inngest.com/concepts/tools#:~:text=models%20through%20features%20like%20OpenAI%E2%80%99s,%E2%80%9D)) ([Tools - AgentKit by Inngest](https://agentkit.inngest.com/concepts/tools#:~:text=Tools%20are%20functions%20that%20extend,Tools%20have%20two%20core%20uses)):
+
+- **name:** Identifier used by the agent to invoke it.
+- **description:** Description for the LLM to decide when to use it (this is shown in the model’s function list).
+- **parameters:** A Zod schema defining the input the tool expects (types and structure) ([Tools - AgentKit by Inngest](https://agentkit.inngest.com/concepts/tools#:~:text=,)). This informs the LLM how to call the function properly.
+- **handler:** The actual TypeScript function to execute when the tool is called. It receives the parsed parameters and a context object (with references to the current agent, network, step, etc.) ([Tools - AgentKit by Inngest](https://agentkit.inngest.com/concepts/tools#:~:text=handler%3A%20async%20%28,%7D%2C)). The handler should perform the action and return a result (which gets fed back to the agent as a tool response).
+
+For example, a simple tool might retrieve a user’s billing charges given a userId and date range:
+
+```ts
+import { createTool } from "@inngest/agent-kit";
+import { z } from "zod";
+
+const listChargesTool = createTool({
+  name: "list_charges",
+  description: "List a user's charges between two dates.",
+  parameters: z.object({
+    userId: z.string(),
+    dateRange: z.object({
+      start: z.string().datetime(),
+      end: z.string().datetime(),
+    }),
+  }),
+  handler: async ({ userId, dateRange }) => {
+    // Implement the logic to fetch charges (e.g., from a database)
+    const charges = await db.findCharges(userId, dateRange.start, dateRange.end);
+    return charges; // this will be returned to the agent as the tool's output
+  },
+});
+```
+
+*(In this example, we used a Zod schema to define that `userId` is a string and `dateRange` has `start` and `end` datetime strings. The handler returns the charges list, which could be an array of charge objects.)* 
+
+**Best Practices for Tools:**
+
+- **Descriptive Name & Description:** Provide a name and description that clearly indicate what the tool does. The LLM decides to use a tool based on whether its description seems relevant ([Tools - AgentKit by Inngest](https://agentkit.inngest.com/concepts/tools#:~:text=Writing%20quality%20,particular%20Tool%20should%20be%20called)). For instance, `"search_web"` with description `"Search the web for information using Brave"` is clear.
+- **Parameter Schema:** Use Zod to strictly define inputs. This ensures the model calls the tool with the correct arguments. If some parameters are optional, use `.nullable()` rather than `.optional()` in Zod ([Tools - AgentKit by Inngest](https://agentkit.inngest.com/concepts/tools#:~:text=Optional%20parameters)).
+- **Implement Safely:** The handler runs server-side, so ensure it’s robust. Validate any external calls. You can use the `network` or `agent` context to store or retrieve info (more on state below).
+- **Tool Outputs:** Return simple, serializable results (objects, strings, etc.). The model will see this result and integrate it into its next message. If the tool returns complex data, consider formatting it or summarizing it, because the LLM will incorporate it as text in the conversation.
+
+Attach tools to an agent by listing them in the agent’s `tools` array when calling `createAgent` ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=const%20supportAgent%20%3D%20createAgent%28,turbo%27%29%2C%20tools%3A%20%5BlistChargesTool%5D%2C)). When the agent runs, if the AI’s response indicates a tool function call, AgentKit will automatically execute the corresponding tool handler, then resume the agent with the tool’s output ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=Tool%20calling)) ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=tools%3A%20%5BlistChargesTool%5D%2C%20)). This happens transparently during the `agent.run()` or network execution. 
+
+**Example:** If an agent has a `search_web` tool and the user prompt asks for current news, the LLM (e.g. GPT-4 with function calling) might decide to call `search_web` with the query. AgentKit will execute our `search_web` handler, get results, and then feed those results back into the model’s context before it produces a final answer ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=Tool%20calling)). All of this is handled in the AgentKit loop.
+
+## Building Agent Networks and Routers
+
+While single agents can be useful, the real power comes from **Networks** – orchestrating multiple agents together. An AgentKit **Network** is essentially a loop that can call one agent after another, sharing state between them, until a stopping condition is reached ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=Networks%20can%20be%20thought%20of,more%20work%20to%20be%20done)) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=Networks%20are%20Systems%20of%20Agents,workflows%20by%20combining%20multiple%20Agents)). With networks, you can model multi-step workflows where different agents handle different parts of the task.
+
+You create a network using `createNetwork({ agents, defaultModel, state, router, maxIter, name })`. A network includes: 
+
+- A list of **agents** that it can call (the team of agents).
+- A **default model** (if not specified, required if any agent doesn’t have its own model) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=agents%3A%20%5BsearchAgent%2C%20summaryAgent%5D%2C%20defaultModel%3A%20openai%28,4o%27%20%7D%29%2C)) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=Each%20Agent%20can%20specify%20it%E2%80%99s,to%20use%20an%20Anthropic%20model)).
+- A shared **State** (discussed in next section) for memory between agents ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=,the%20next%20agent%20to%20run)).
+- A **Router** function to decide which agent runs next and when to stop ([Routers - AgentKit by Inngest](https://agentkit.inngest.com/concepts/routers#:~:text=The%20purpose%20of%20a%20Network%E2%80%99s,the%20current%20Network%20%2015)).
+- Optionally, a `maxIter` to limit iterations (prevent infinite loops) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=Maximum%20iterations)).
+
+**How a Network Executes:** When you call `network.run(userInput)`, AgentKit enters a loop with the following steps ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=The%20network%20runs%20its%20core,loop)) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=Run%20the%20Agent)):
+
+1. **Router Decides Next Agent:** At the start of each iteration (or call), the network’s router is invoked to choose the next agent to handle the task ([Routers - AgentKit by Inngest](https://agentkit.inngest.com/concepts/routers#:~:text=What%20is%20a%20Router%3F)). The router has access to the current state, the history of previous results, and the iteration count.
+2. **Agent Runs:** The chosen agent is called with the current input (initially the user’s prompt, in subsequent iterations it could be a new prompt or just continued state). The agent will execute, potentially using its tools as needed ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=Tool%20calling)). The agent produces an output (text or data).
+3. **State Updates:** The result of the agent call is stored in the network’s state history (and the agent’s tool outputs may also update the state’s key-value data) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=Store%20the%20result)).
+4. **Loop or Terminate:** The router is called again with the updated state and can decide to continue (choose another agent for the next step) or to stop the loop (by returning `undefined` or no agent) ([Routers - AgentKit by Inngest](https://agentkit.inngest.com/concepts/routers#:~:text=A%20router%20is%20a%20function,runs%2C%20which%20decides%20whether%20to)) ([Routers - AgentKit by Inngest](https://agentkit.inngest.com/concepts/routers#:~:text=1,undefined)). This repeats until no further agent is returned by the router, at which point `network.run()` returns the final result (often an aggregated output from one or more agents).
+
+This architecture lets multiple agents collaborate. For example, one agent can gather information, another can analyze it, and a final agent can produce the answer. All the while, the **Router** is coordinating the sequence.
+
+**Router Strategies:** You have a few ways to define a router in AgentKit:
+
+- **Code-based Router:** A custom function you write to decide the next agent based on the state, last result, call count, etc. ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=const%20network%20%3D%20createNetwork%28,return%20classifier)) ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=,)). This is deterministic and transparent. For example, you might route based on a flag in state (e.g., `state.data.category === "technical"`).
+- **Routing Agent (LLM-based):** AgentKit provides a special type of agent that acts as a router. It’s essentially an LLM that looks at the conversation and decides which agent should go next (autonomous routing) ([Routers - AgentKit by Inngest](https://agentkit.inngest.com/concepts/routers#:~:text=name%3A%20,)). This is useful for dynamic workflows, but can be less predictable. (By default, if you don’t provide a router, AgentKit uses a default routing agent internally) ([Routers - AgentKit by Inngest](https://agentkit.inngest.com/concepts/routers#:~:text=Without%20a%20,%E2%80%9CDefault%20Routing%20Agent%E2%80%9D%20is%20a)).
+- **Hybrid Router:** You can combine code logic with an LLM router. For instance, use code to handle obvious decisions and delegate complex ones to a routing agent ([Routers - AgentKit by Inngest](https://agentkit.inngest.com/concepts/routers#:~:text=,the%20best%20of%20both%20worlds)) ([Routers - AgentKit by Inngest](https://agentkit.inngest.com/concepts/routers#:~:text=Routing%20Agents%20look%20similar%20to,lifecycle%20method)).
+
+For clarity and control, this guide focuses on **code-based routing** using a simple function. Code routers are defined by the `router:` option in `createNetwork`. Here’s an example router that picks an agent based on iteration count and content of the last message:
+
+```ts
+const network = createNetwork({
+  agents: [classifierAgent, writerAgent],
+  router: ({ lastResult, callCount, network }) => {
+    if (callCount === 0) {
+      return classifierAgent;  // first, classify the query
+    }
+    // After classification, check state or lastResult to decide
+    const lastMessage = lastResult?.output?.at(-1);
+    const text = (lastMessage?.type === 'text') ? String(lastMessage.content) : '';
+    if (callCount === 1 && text.includes("question")) {
+      return writerAgent;  // if it was determined to be a question, use writer next
+    }
+    return undefined;  // otherwise, stop after one iteration
+  },
+  defaultModel: openai({ model: "gpt-4" }),
+});
+``` 
+
+In this pseudocode, the router calls `classifierAgent` first. That agent might tag the input as a question. Then the router sees the content and decides to call `writerAgent` if needed. Finally, it stops. You can base routing decisions on anything in `network.state` or `lastResult`. For multi-agent workflows, a typical pattern is to route by role or by some flag set in state (e.g., which sub-task is completed).
+
+**Note:** Always set a reasonable `maxIter` when using an LLM-based or complex router to avoid infinite loops ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=A%20Network%20can%20specify%20an,limit%20the%20number%20of%20iterations)). For example, `maxIter: 5` ensures the network stops after 5 agent calls regardless. This is a safety net.
+
+## Shared State and Memory
+
+In a multi-agent system, agents need a way to share information and context. AgentKit provides **State** as a mechanism for memory and coordination ([State - AgentKit by Inngest](https://agentkit.inngest.com/concepts/state#:~:text=State%20is%20shared%20memory%2C%20or,up%20structured%20data%20from%20tools)). A network state has two main parts:
+
+- **History:** A chronological log of all messages, including user prompts, agent outputs, and tool calls ([State - AgentKit by Inngest](https://agentkit.inngest.com/concepts/state#:~:text=%2A%20History%20of%20messages%20,easily%20model%20complex%20agent%20workflows)) ([State - AgentKit by Inngest](https://agentkit.inngest.com/concepts/state#:~:text=History)). This is automatically recorded. Each turn (agent run) produces an `InferenceResult` that goes into history.
+- **Typed Key-Value Data:** A dictionary (object) where you can store arbitrary data between agent calls ([State - AgentKit by Inngest](https://agentkit.inngest.com/concepts/state#:~:text=AgentKit%E2%80%99s%20State%20stores%20data%20in,two%20ways)). You define the shape of this data with a TypeScript interface when creating the state. Agents and tools can read from or write to this state object to remember things or signal information ([State - AgentKit by Inngest](https://agentkit.inngest.com/concepts/state#:~:text=Common%20uses%20for%20data%20include%3A)).
+
+You create an initial state using `createState<YourStateType>(initialData)`. For example:
+
+```ts
+interface MyState {
+  category?: string;
+  searchResults?: string;
+  finalAnswer?: string;
+}
+const state = createState<MyState>({
+  category: undefined,
+  searchResults: undefined,
+  finalAnswer: undefined,
+});
+```
+
+This defines a state with fields for `category`, `searchResults`, etc., initially empty. We pass this `state` to the network when creating it. During execution, `network.state.data` holds the current values, and `network.state.history` (or `network.history`) holds message logs.
+
+**Using State in Tools and Agents:**
+
+- **Tools can modify state:** In a tool’s handler, you get `{ network, agent, step }` context. You can do `network.state.data[...] = ...` to store results. For example, a tool that writes files might accumulate them in state ([State - AgentKit by Inngest](https://agentkit.inngest.com/concepts/state#:~:text=handler%3A%20%28output%2C%20,files%20%3D%20files%3B)). Similarly, a custom tool could set a flag like `network.state.data.category = "technical"` to be read by the router or another agent.
+- **Agents (via lifecycle):** In agent lifecycle hooks (like `onFinish` or `onStart`), you can also update or read state. For instance, an agent’s `onFinish` could inspect the agent’s output and store a summary in state, or an `onStart` might add state data into the prompt ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=lifecycle%3A%20,using%20Network%20state%20and%20history)) ([State - AgentKit by Inngest](https://agentkit.inngest.com/concepts/state#:~:text=,State%20based%20routing)).
+- **Router usage:** As shown, the router can use `network.state` to decide routing. This is a common pattern: one agent’s output (or a tool it called) sets a state variable, and the router function reads that variable to pick the next agent.
+
+State is **not persisted** beyond a single `network.run()` invocation – it’s in-memory for that workflow run ([State - AgentKit by Inngest](https://agentkit.inngest.com/concepts/state#:~:text=The%20,calls)). If you want long-term memory across separate runs (sessions), you would need to save the state externally (database or trigger events to carry it forward). Inngest functions can naturally persist data between steps, but AgentKit state by itself resets each run. This ephemeral state is usually enough for multi-agent reasoning within one workflow.
+
+**Best Practices for State:**
+
+- **Define a Schema:** Create a TypeScript interface for your state and use `createState<Interface>()` so you get type safety on `state.data`. Only store what you need.
+- **Keep It Lean:** Don’t store huge amounts of text in state.data if you can avoid it (the history is already storing transcripts). Use state for structured info: e.g., an extracted user name, a decision flag, a collected piece of data.
+- **Leverage History:** You usually don’t need to copy conversation text into state.data because the next agent will automatically get the **history** (previous messages) as context. State data is more for non-language data or things you want to easily query in code (e.g., “was research done already?” as a boolean).
+- **Use in Tools for Coordination:** Tools are a great place to use state. For example, if you have a multi-step tool (an advanced concept) that processes a file in chunks, it can store partial results in state between steps.
+
+## Modular and Reusable Agent Design
+
+As your agent-based system grows, organizing code becomes important. Here are some guidelines for modularity and reuse:
+
+- **Separate Files/Modules:** Define each agent and its related tools in its own module. For example, you might have `agents/researchAgent.ts`, `agents/techSupportAgent.ts`, etc. In each file, you can create the specific tools that agent uses (if they are unique) and then the agent itself. This keeps the logic self-contained and easier to test.
+- **Reuse Common Tools:** If multiple agents share a tool (e.g. a generic `search_web` tool), define it once (maybe in a `tools/` directory) and import it for whichever agents need it. Avoid duplicating tool definitions.
+- **Export Agents for Networks:** After defining an agent, export it from the module. Then, in your network orchestration file (for example `agents/network.ts` or an Inngest function file), import the agents and assemble the network. This separation means agents can potentially be reused in different networks or function triggers.
+- **Single Responsibility for Agents:** Reinforcing this – design each agent to do one thing well. If a task naturally breaks into sub-tasks, it might be a sign to use multiple agents in sequence rather than one monolithic agent. This not only helps the AI (smaller focused prompts) but also allows swapping out parts (maybe you upgrade the Research agent’s tools later without touching others).
+- **Naming Conventions:** Give clear names to agents and tools, both for your code readability and for the AI’s understanding. For instance, `TechSupportAgent` with a tool `fetch_docs` is more obvious than a generic `Agent2` with `tool1`.
+- **Configuration and Constants:** If you have any configuration (API keys for tools, etc.), keep those outside of agent definitions. For example, if a tool calls an external API, it can read from environment variables or a config module. This way, your agent definitions remain pure and easy to test (you could mock the tool handler for example).
+
+Following these practices, you can build a library of agents and tools that feel like LEGO blocks – easy to plug into new workflows as needed. Now, let’s put it all together in a concrete example.
+
+## Example: Multi-Agent Chatbot Workflow
+
+To illustrate a multi-agent setup, consider a chatbot that answers user questions by delegating tasks to specialized agents. We’ll design the following agents for this scenario:
+
+- **Director Agent:** The orchestrator that receives the user’s question. It will decide (either via its own analysis or via a tool) what kind of help is needed – e.g., does this require web research or technical troubleshooting? The Director doesn’t answer directly; it delegates.
+- **Research Agent:** A knowledge hunter that can search the web. It has tools like a Brave Search API and a browser fetcher to retrieve information from URLs. Used for general questions (non product-specific).
+- **Tech Support Agent:** A specialist for technical or product-related queries. It can fetch internal documentation or check known issues. Used for questions about errors, outages, or technical guidance.
+- **Supervisor Agent:** A final reviewer that takes the outputs from the other agents and crafts the final answer for the user. It ensures the answer is complete and well-formed. (This is optional but adds a “quality control” layer.)
+
+The communication flow will be: **User -> Director -> (Research or Tech) -> Supervisor -> User**. The Director decides which path (research vs. tech) and the Supervisor finalizes the answer. We will implement this with a code-based router in the network.
+
+### Define Tools for Each Agent
+
+First, let’s define the tools needed by our agents:
+
+**1. Classification Tool (for Director):** The Director agent will use a simple tool to classify the user’s question as `"general"` or `"technical"`. This tool’s handler will set a flag in the state for the router to read.
+
+```ts
+import { createTool } from "@inngest/agent-kit";
+import { z } from "zod";
+
+const classifyTool = createTool({
+  name: "classify_query",
+  description: "Classify the user's question as 'general' or 'technical'.",
+  parameters: z.object({
+    category: z.enum(["general", "technical"]),
+  }),
+  handler: ({ category }, { network }) => {
+    network.state.data.category = category;  // store category in state
+    return `Marked query as ${category}`;    // optional return message
+  },
+});
+```
+
+*How it works:* We expect the Director’s model, after reading the question, to decide on a category and call `classify_query` with the chosen category. The handler then sets `state.data.category` accordingly. We’ll initialize `state.data.category` as `undefined` and after this tool runs it becomes either `"general"` or `"technical"`. (If the model doesn’t call the tool, our router will fall back to its own logic — more on that below.)
+
+**2. Web Search Tool (for Research):** A tool that uses Brave Search API to find web results for a query.
+
+```ts
+const searchWebTool = createTool({
+  name: "search_web",
+  description: "Search the web (via Brave) for relevant information on a query.",
+  parameters: z.object({ query: z.string() }),
+  handler: async ({ query }) => {
+    // Example: call Brave Search API (pseudo-code)
+    const results = await braveSearchApi.search(query);
+    // Simplify the results to a summary or list of top links
+    return results.top3;  // e.g., return top 3 results as an array or string
+  },
+});
+```
+
+This tool should ideally return a concise summary or a few top links for the query. The Research agent will likely call this first when it needs information.
+
+**3. Web Browser Tool (for Research):** A tool to fetch the content from a given URL (like clicking on a search result).
+
+```ts
+const openUrlTool = createTool({
+  name: "open_url",
+  description: "Fetch the content of a webpage by URL. Use after search_web to get details.",
+  parameters: z.object({ url: z.string().url() }),
+  handler: async ({ url }) => {
+    const content = await fetch(url).then(res => res.text());
+    // Perhaps truncate or summarize content if very large
+    return content.slice(0, 1000);  // return first 1000 characters for example
+  },
+});
+```
+
+In practice, you might want to integrate a more sophisticated browser or parsing, but this gives the idea. The Research agent can call `open_url` on one of the URLs it got from `search_web` to retrieve specific details.
+
+**4. Documentation Search Tool (for Tech Support):** A tool for searching internal docs or knowledge base for technical issues.
+
+```ts
+const fetchDocsTool = createTool({
+  name: "fetch_docs",
+  description: "Search internal knowledge base for answers to technical queries.",
+  parameters: z.object({ query: z.string() }),
+  handler: async ({ query }) => {
+    // Pseudo-code: search your documentation database or API
+    const docResult = await internalDocSearch(query);
+    return docResult.summary || docResult.content;
+  },
+});
+```
+
+This could interface with an internal search system or even a local vector database of documents. For our example, assume it returns some relevant info or summary.
+
+*(You can imagine additional tools for Tech Support, like checking system status, retrieving user info, etc., depending on the domain. Keep it simple for now.)*
+
+### Create Agents with their Tools
+
+Now we create each agent, assigning the tools defined:
+
+**Director Agent:**
+
+```ts
+import { createAgent, openai } from "@inngest/agent-kit";
+
+const directorAgent = createAgent({
+  name: "Director",
+  description: "Decides how to handle the user's query by delegating to other agents.",
+  system: "You are the Director agent. Your job is to analyze the user's question and determine if it's a general info query or a technical support query. " + 
+          "If general, you will call the 'classify_query' tool with category 'general'. If technical, call it with 'technical'. Do NOT directly answer the question.",
+  model: openai({ model: "gpt-3.5-turbo" }),  // use a fast model for classification
+  tools: [classifyTool],
+});
+```
+
+We gave the Director a system prompt instructing it to classify and not answer directly. It has the `classify_query` tool available. We use GPT-3.5 here for speed, since this is a relatively simple task (you could use GPT-4 as well).
+
+**Research Agent:**
+
+```ts
+const researchAgent = createAgent({
+  name: "Researcher",
+  description: "Fetches information from the web for general queries.",
+  system: "You are a research expert with web access. Your goal is to find information online to answer the user's question. Use the provided tools to search the web and fetch page content. Summarize findings clearly.",
+  model: openai({ model: "gpt-4" }),  // use a powerful model for synthesis
+  tools: [searchWebTool, openUrlTool],
+});
+```
+
+The Researcher uses GPT-4 (for better comprehension and summary of content). It has two tools: `search_web` and `open_url` to actually get information. The prompt encourages it to use those tools as needed and give a clear summary.
+
+**Tech Support Agent:**
+
+```ts
+const techAgent = createAgent({
+  name: "Tech Support",
+  description: "Helps with technical issues or product support questions.",
+  system: "You are a technical support specialist. The user’s question is likely about a technical issue or product bug. Use available tools to find relevant info in our knowledge base or systems. Provide a clear, step-by-step answer or solution.",
+  model: openai({ model: "gpt-4" }),  // also a powerful model
+  tools: [fetchDocsTool],
+});
+```
+
+We gave Tech Support the `fetch_docs` tool to query internal resources. The system prompt positions it as a specialist. (We use GPT-4 here as well for quality; you might adjust models based on cost/performance.)
+
+**Supervisor Agent:**
+
+```ts
+const supervisorAgent = createAgent({
+  name: "Supervisor",
+  description: "Reviews and compiles the final answer for the user.",
+  system: "You are the supervisor agent. Your task is to take all available information gathered by other agents and formulate a final answer to the user. Ensure the answer is correct, concise, and addresses the user’s question fully.",
+  model: openai({ model: "gpt-4" }),
+  // No external tools; it just uses the conversation history and state
+});
+```
+
+The Supervisor doesn’t have any tools in this design – it’s mainly synthesizing the final answer. Its context will include the whole conversation (user question, Director’s actions, Research/Tech outputs, etc., as per the history) plus any state variables we kept. This agent should produce the answer that gets back to the user.
+
+### Assemble the Network and Router
+
+Now, let’s set up the network that ties these agents together. We’ll use a code-based router that implements the logic: Director always goes first, then either Research or Tech depending on `category`, then Supervisor last.
+
+```ts
+import { createNetwork, createState } from "@inngest/agent-kit";
+
+// Define the shape of our state as earlier:
+interface ChatState {
+  category?: "general" | "technical";
+  // (We could also include fields for collected info, but agents will convey via history)
+}
+const state = createState<ChatState>({ category: undefined });
+
+const agentNetwork = createNetwork({
+  name: "Q&A Workflow",
+  agents: [directorAgent, researchAgent, techAgent, supervisorAgent],
+  state,
+  defaultModel: openai({ model: "gpt-4" }),  // default for any agent without its own model
+  maxIter: 5,
+  router: ({ network, callCount }) => {
+    const category = network.state.data.category;
+    if (callCount === 0) {
+      return directorAgent;  // first, always use Director to analyze question
+    }
+    if (callCount === 1) {
+      // After Director, decide which specialist to use
+      return category === "technical" ? techAgent : researchAgent;
+    }
+    if (callCount === 2) {
+      return supervisorAgent;  // after specialist, go to Supervisor to finalize
+    }
+    // callCount 3 or more – end the loop
+    return undefined;
+  },
+});
+```
+
+A few notes on this router function:
+
+- `callCount` starts at 0 for the first call. We ignore `lastResult` here and rely on the state flag for simplicity.
+- The Director should set `state.data.category` via the `classify_query` tool. If for some reason it doesn’t (e.g., it failed to call the tool), then `category` remains `undefined` and our condition will route to the Research agent by default (since `category === "technical"?` will be false). This is a design choice: we assume unclassified defaults to general research.
+- We cap `maxIter` at 5 just in case (Director -> Specialist -> Supervisor is 3 calls, so we won’t hit 5, but it’s a safety limit).
+- The network’s `defaultModel` is set to GPT-4. We explicitly gave each agent a model, so this might not be used. However, if an agent didn’t specify a model, it would fall back to this ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=agents%3A%20%5BsearchAgent%2C%20summaryAgent%5D%2C%20defaultModel%3A%20openai%28,4o%27%20%7D%29%2C)).
+
+With this network defined, `agentNetwork.run(userPrompt)` will execute the full loop and return the final output (which should be the Supervisor’s answer in our design). The intermediate steps and tool usage happen internally as described.
+
+### Simulation of Execution
+
+To clarify the flow, here’s what happens when a user question comes in, e.g. *“Our database went down yesterday. What caused it and how can we prevent it?”*:
+
+1. **Director (iteration 0):** Sees the question. Likely identifies it as a technical issue (mentions database outage). It calls `classify_query` with `"technical"`. The tool sets `state.data.category = "technical"`. Director’s part is done (it doesn’t provide an answer, maybe just an internal note like “Marked query as technical”). 
+2. **Router:** callCount=1 now, `category = "technical"`, so router returns `techAgent`.
+3. **Tech Support (iteration 1):** Tech agent sees the conversation so far (user question, Director’s classification). Its prompt knows it should help with a technical issue. It might call `fetch_docs` with something like query `"database outage prevention"`. The tool runs, perhaps returns some info (maybe an internal post-mortem or knowledge base entry about common causes). The Tech agent then produces an answer draft or some findings based on that. For example, it might output: *“It looks like the outage was caused by a memory leak... To prevent it, we should update X and add monitoring Y.”*
+   - The tech agent’s full answer is not final to the user yet (the user isn’t seeing it directly, the Supervisor will). But it will be in the history and possibly also saved in `state.data` if we wanted (we didn’t define explicit fields, but we could have e.g. `state.data.techFindings`).
+4. **Router:** callCount=2, router returns `supervisorAgent`.
+5. **Supervisor (iteration 2):** The Supervisor agent now has the entire dialogue: user question, Director’s note, Tech’s drafted info. The system prompt for Supervisor tells it to make the final answer. It might combine everything into a polished response like: *“The database outage yesterday was caused by ... To prevent this in the future, our team should ... (etc.)”*.
+6. **Router:** callCount=3, which triggers `return undefined` in router, ending the loop. `network.run()` returns the Supervisor’s answer.
+
+If the question had been general (non-technical), step 2 would route to `researchAgent` instead. Then the Research agent would use `search_web` and `open_url` tools to gather info, and Supervisor would use those findings.
+
+This design demonstrates agents working together: one decides the route, one does the core work, one finalizes the result. The **tools** allowed the specialist agents to do actions (web search, etc.), and the **state** (the `category`) allowed coordination between Director and router.
+
+You can expand this pattern with more agents or more decision points (for example, Director could break tasks into multiple parts, or Supervisor could hand back to another agent if something is missing). The key is to define clear rules in the router and use state to keep track of what’s done.
+
+## Integrating Agent Workflows with Inngest Functions
+
+Now that we have our agent network, we want to run it as part of our Next.js application’s backend. Inngest allows us to run this workflow as a **durable function** in the background, triggered by events such as user actions. We’ll cover how to: 
+
+- Define an Inngest function that invokes the agent network.
+- Trigger that function from a Next.js Server Action or API route when a user asks a question.
+- Stream or return the result back to the frontend.
+
+### Creating an Inngest Function for the Agent Workflow
+
+First, initialize an Inngest client in your project (usually done in a central file, e.g. `src/inngest/client.ts`):
+
+```ts
+import { Inngest } from "inngest";
+
+export const inngest = new Inngest({ name: "MyApp" });
+```
+
+*(The name can be anything identifying your app; in the docs they use an `id` or name.)* 
+
+Now, create a function using `inngest.createFunction`. Inngest functions are triggered by events (or schedules). We’ll use a custom event (like `"app/user.question"`) for when the user submits a question. For example, in `src/inngest/functions/agentWorkflow.ts`:
+
+```ts
+import { inngest } from "../client";
+import { agentNetwork } from "@/agents/network";  // the network we created above
+
+export const answerQuestionWorkflow = inngest.createFunction(
+  { 
+    id: "answer-question-workflow", 
+    name: "Answer User Question (AgentKit)", 
+    // You can also add concurrency or throttle controls here if needed
+  },
+  { event: "app/user.question" },  // trigger on this custom event
+  async ({ event, step }) => {
+    const userQuestion = event.data.question as string;
+    // Run the agent network with the user's question
+    const result = await step.run("agent_workflow", async () => {
+      return await agentNetwork.run(userQuestion);
+    });
+    // Optionally, do something with result (save to DB, etc.)
+    return { answer: result };
+  }
+);
+```
+
+A few important points in this function:
+
+- We gave it an ID and name (for identification in the Inngest UI/logs).
+- Trigger is `{ event: "app/user.question" }` – meaning whenever we send an event named `"app/user.question"`, this function will run.
+- Inside the handler, we retrieve the question from `event.data`. We then call our `agentNetwork.run(userQuestion)` inside a `step.run` wrapper. `step.run("agent_workflow", async () => {...})` is optional but recommended. It creates a step named `"agent_workflow"` in Inngest, which helps with observability and any retries ([Human in the Loop - AgentKit by Inngest](https://agentkit.inngest.com/advanced-patterns/human-in-the-loop#:~:text=%7B%20event%3A%20,ticketId%29%3B%20return%20ticket%3B)) ([Human in the Loop - AgentKit by Inngest](https://agentkit.inngest.com/advanced-patterns/human-in-the-loop#:~:text=const%20ticket%20%3D%20await%20step.run%28,ticketId%29%3B%20return%20ticket%3B)). Essentially, it labels this block of code; if the agentNetwork throws an error or times out, Inngest could retry this step depending on config.
+- After getting the result, we return an object containing the answer. (Inngest functions can return data; in this case it might not be directly used, but it could be if you call this function via API.)
+
+Now we need to **expose this function to Inngest**. In Next.js (App Router), the usual approach is to create an API route for Inngest. Typically, you create `src/app/api/inngest/route.ts`:
+
+```ts
+import { serve } from "inngest/next";
+import { inngest } from "@/inngest/client";
+import { answerQuestionWorkflow } from "@/inngest/functions/agentWorkflow";
+
+export const { GET, POST, PUT } = serve({
+  client: inngest,
+  functions: [ answerQuestionWorkflow ],
+});
+```
+
+This uses `serve()` from the Inngest SDK to handle incoming requests from the Inngest orchestrator ([Next.js Quick Start - Inngest Documentation](https://www.inngest.com/docs/getting-started/nextjs-quick-start#:~:text=Next%2C%20import%20your%20Inngest%20function,handler%20so%20Inngest)) ([Next.js Quick Start - Inngest Documentation](https://www.inngest.com/docs/getting-started/nextjs-quick-start#:~:text=export%20const%20,always%20add%20all%20your%20functions)). It will automatically wire up the routes for GET/POST/PUT (Inngest uses these to trigger and manage the function runs). By listing our `answerQuestionWorkflow` in `functions`, we register it. 
+
+Now, when the Inngest dev server or cloud receives an event `app/user.question`, it knows about this function and can invoke it.
+
+### Triggering the Workflow from Next.js (Server Actions or API)
+
+In our scenario, when a user submits a question via the frontend (maybe a form or chat input), we want to send the event to kick off the workflow. There are two common ways:
+
+**a. Using Next.js Server Action (recommended in Next 13+):** If your page or component uses the new server actions, you can call `inngest.send()` directly in the action. For example:
+
+```tsx
+// In a Next.js server component or a client component using a server action:
+"use server";
+import { inngest } from "@/inngest/client";
+
+export async function askQuestionAction(userQuestion: string) {
+  await inngest.send({
+    name: "app/user.question",
+    data: { question: userQuestion },
+  });
+}
+```
+
+Here, `askQuestionAction` is a server action that takes the question string and uses `inngest.send()` to emit the event ([Next.js Quick Start - Inngest Documentation](https://www.inngest.com/docs/getting-started/nextjs-quick-start#:~:text=%2F%2F%20Create%20a%20simple%20async,%7D%2C)) ([Next.js Quick Start - Inngest Documentation](https://www.inngest.com/docs/getting-started/nextjs-quick-start#:~:text=%2F%2F%20Send%20your%20event%20payload,%7D%2C)). The Inngest client will send this event to the Inngest service (locally, the dev server; in prod, the cloud endpoint), which in turn triggers our function. The `send()` call is fire-and-forget (it queues the event). You might immediately return a response to the user saying "Got it, working on your answer..." while the background workflow does its thing.
+
+**b. Using an API Route:** Alternatively, you could set up an API route (say `/api/ask`) that calls `inngest.send()` when hit. This is essentially the same, but using the traditional API route approach. For instance:
+
+```ts
+// src/app/api/ask/route.ts
+import { NextResponse } from "next/server";
+import { inngest } from "@/inngest/client";
+
+export async function POST(request: Request) {
+  const { question } = await request.json();
+  await inngest.send({
+    name: "app/user.question",
+    data: { question },
+  });
+  return NextResponse.json({ status: "queued" });
+}
+```
+
+This route can be called by your frontend (via fetch when user submits) to enqueue the question event. The Next.js Quick Start guide shows a similar pattern using a /api/hello endpoint ([Next.js Quick Start - Inngest Documentation](https://www.inngest.com/docs/getting-started/nextjs-quick-start#:~:text=%2F%2F%20Create%20a%20simple%20async,%7D%2C)).
+
+Either way, the key is generating an event with the correct name and payload. In our case, `name: "app/user.question"` and include the question text. You could also include additional data: for example, user ID (to personalize answers), or any context. All of that would be accessible via `event.data` in the Inngest function.
+
+### Receiving and Using the Result
+
+Since this is an asynchronous workflow, how do we get the answer back to the user? There are a few patterns:
+
+- **Polling or Status Update:** The simplest is to have the frontend poll for an answer. For example, when you queue the question event, you could get back some ID (Inngest event ID or a generated query ID) and then poll an API or database until the answer is ready. The Inngest function could, for instance, write the answer to a database or cache keyed by that ID. This approach is not real-time but straightforward.
+- **Webhooks or SSE from Inngest:** Inngest has the concept of sending events or waiting for events. We could set up another event when the function completes. For instance, at the end of the Inngest function, do `step.sendEvent({ name: "app/user.answer", data: { answer, userId } })`. The frontend could subscribe to that via WebSocket or Server-Sent Events if you have such infrastructure. This requires more setup.
+- **Direct Response (Not typically available):** If using Inngest Dev Server UI, you can see the output in the run log, but to directly send it to the frontend without polling, you'd need a push mechanism.
+
+However, since the user specifically asked about **streaming results to the frontend**, we might consider a different tactic for immediate responses: using streaming via a direct route rather than background. This is discussed in the next sections (Real-Time vs Background). 
+
+For now, assuming a background job, one simple strategy is to have the function return the answer and then **fetch it via Inngest API**. Inngest Dev Server provides a UI where you can manually see results, but programmatically, you might not want to call Inngest API from the front-end. Instead, possibly store the result. For example, after `agentNetwork.run`, you could do:
+
+```ts
+await step.run("save_answer", async () => {
+  await db.insertAnswer({ question: userQuestion, answer: result, userId: event.data.userId });
+});
+```
+
+Then your frontend can poll an endpoint that checks if there's an answer in the DB for that question. This is more of an implementation detail up to your app’s needs.
+
+**Summary:** Connect your Next.js app to the agent workflow by sending events on user action, use Inngest functions to run the agent network reliably in the background, and decide how to deliver the answer back (polling, pushing, etc.). This decouples the user request from the heavy lifting (so your Next.js API can respond quickly while the actual work happens in the background).
+
+## Custom Model Provider Integration (Local vs. Cloud)
+
+In development, you might want to use local LLMs (for privacy or cost reasons), such as running a model in LM Studio or via Ollama, whereas in production you use cloud APIs (OpenAI, Anthropic, or via services like OpenRouter). The user has provided a custom setup through `customOpenAI.ts` and `modelProvider.ts`. Here’s how to integrate custom model providers with AgentKit:
+
+**Understanding AgentKit Models:** AgentKit comes with built-in model adapters for OpenAI, Anthropic, etc. (via functions like `openai({...})`, `anthropic({...})`) ([Models - AgentKit by Inngest](https://agentkit.inngest.com/concepts/models#:~:text=import%20,kit)) ([Models - AgentKit by Inngest](https://agentkit.inngest.com/concepts/models#:~:text=OpenAI)). These use API keys from your environment by default and call the respective providers. Under the hood, AgentKit uses Inngest’s `step.ai` to call models reliably ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=Inference%20call)). 
+
+To use a **custom model or endpoint**, you have a couple of approaches:
+
+- **Leverage Compatibility Modes:** Some local AI servers mimic OpenAI’s API. For example, LM Studio can run as an OpenAI-compatible server, and OpenRouter can accept OpenAI format calls. If your custom provider fits into an existing adapter by just changing the base URL or API key, use that. For instance, you can configure the environment variables `OPENAI_API_KEY` and `OPENAI_API_BASE_URL` to point to your local LM Studio server. Then using `openai({ model: "your-model-name" })` in AgentKit will actually send requests to your local server instead of OpenAI’s cloud. This way, you can develop locally on a llama-based model and then switch the env vars in production to hit OpenAI or OpenRouter as needed.
+- **Custom Model Adapter:** If the above is not sufficient (say your model provider has a completely different API), you can create a custom model function. While AgentKit’s docs focus on their built-ins, you can implement the `Model` interface manually. A model in AgentKit is essentially an object with a `.call()` method that takes in prompts and returns a completion. For example, you could write a function `localModel(options)` that returns an object implementing a call to your local model API. Then use that in `createAgent({ model: localModel({...}) })`. This requires understanding the AgentKit model interface, but it’s doable. (Check AgentKit’s reference or GitHub for how `openai()` is implemented, and mirror it.)
+- **Using the provided `modelProvider.ts`:** It sounds like you have a `modelProvider.ts` and `customOpenAI.ts` already. Likely, `modelProvider.ts` exports a unified interface to get a model based on some config (maybe it reads an ENV var like `MODEL_PROVIDER=ollama` vs `MODEL_PROVIDER=openai`). You should integrate this with AgentKit by calling the appropriate provider function in the agent definitions. For example, instead of `openai({ model: "gpt-4" })`, you might call `customOpenAI({ model: "gpt-4" })` which internally checks if it should route to OpenRouter, or LM Studio, etc. Ensure that whatever `customOpenAI` returns is compatible with AgentKit’s expected model interface. If `customOpenAI` is wrapping the OpenAI SDK, it might need to adapt to AgentKit’s format. The AgentKit docs mention that each model helper uses an API key from env or parameter ([Models - AgentKit by Inngest](https://agentkit.inngest.com/concepts/models#:~:text=Each%20model%20helper%20will%20first,option%20to%20the%20model%20helper)); your custom function should do similarly.
+
+**Local Dev Setup:** For LM Studio, one approach is to run it with `OPENAI_API_BASE_URL=http://localhost:port/v1` and a dummy `OPENAI_API_KEY`. AgentKit’s `openai` calls will then go there. For Ollama, if it provides an OpenAI-like interface, you can do the same. If not, consider if they offer a different API – you might have to implement a custom tool to call Ollama if it’s not directly pluggable as a model.
+
+**Production Setup:** OpenRouter can act as a middleman for OpenAI and Anthropic. If you use OpenRouter, you’d set `OPENAI_API_BASE_URL=https://openrouter.ai/api/v1` and `OPENAI_API_KEY=<your OpenRouter API key>` (with appropriate model IDs, e.g., model name might be slightly different like `"openrouter/gpt-4"` depending on their format). For Anthropic’s Claude via OpenRouter, you might actually call through the same OpenAI interface if they support function calling, or use a separate path. Alternatively, AgentKit’s `anthropic()` can be used with an Anthropic API key for Claude models ([Networks - AgentKit by Inngest](https://agentkit.inngest.com/concepts/networks#:~:text=const%20summaryAgent%20%3D%20createAgent%28,sonnet%27%20%7D%29%2C)). 
+
+In summary, **decide at runtime which model to use** based on environment or config. Your `modelProvider.ts` can export something like `getModel(modelName: string)` that returns either `openai({ model: modelName })` or calls `ollama({ model: modelName })` etc., depending on a setting. Then in your agent definitions, do `model: getModel("gpt-4")`. This way, you don’t hard-code OpenAI in the agents – it will use the custom provider selection. This abstraction is useful to switch between local vs cloud seamlessly.
+
+Keep in mind:
+- If using local models, you may not have function calling support (depending on the implementation). Tools might not work if the local model doesn't support the OpenAI function call format. In such cases, consider limiting tool usage or having fallback logic.
+- Test each provider path: ensure that when you point to LM Studio, the agents still work (perhaps with simpler prompts, smaller model), and when pointing to OpenAI, everything still functions.
+
+For more details, refer to AgentKit documentation on Models ([Models - AgentKit by Inngest](https://agentkit.inngest.com/concepts/models#:~:text=Leverage%20different%20provider%E2%80%99s%20models%20across,Agents)) and your model provider's docs. Integrating custom models may require some experimentation, but AgentKit’s flexible model interface is meant to accommodate various providers.
+
+## Logging and Debugging Agents
+
+Developing agent workflows can be tricky because an LLM might not do what you expect on the first try. Here are tips for observing and debugging the agent behavior:
+
+- **Use Inngest Logging:** Inside an Inngest function, you have access to `step.log()` which you can use to log messages that will appear in the Inngest UI for that function run. You can log at various points: when starting the network, after each agent, etc. For example:
+  ```ts
+  await step.log("User question received: " + userQuestion);
+  const result = await step.run("agent_workflow", async () => {
+    return await agentNetwork.run(userQuestion);
+  });
+  await step.log("Agent workflow completed.");
+  ```
+  Each `step.log` entry will be timestamped in the function run timeline, helping you see the sequence of events.
+- **Inspect the InferenceResult:** When you run an agent or network, the return is typically an `InferenceResult` or an array of messages. For a single agent, `agent.run()` returns an `InferenceResult` object which includes the conversation messages and any tool calls. For a network, `network.run()` may return the final agent’s `InferenceResult` or combined output. You can `console.log(result)` in your code (or use `step.log(JSON.stringify(result))` in the function) to see the raw data structure. This often contains the full dialogue and outputs from tools. It’s extremely useful for debugging what the AI “thought” and where a tool was invoked.
+- **Lifecycle Hooks for Debugging:** Temporarily, you can add lifecycle hooks to agents to peek at their prompts or outputs. For example, add an `onStart` that logs the prompt or an `onFinish` that logs the model’s raw output before tools. E.g.:
+  ```ts
+  lifecycle: {
+    onStart: async ({ prompt }) => { console.log("Prompt to model:", prompt); return { prompt }; },
+    onResponse: async ({ result }) => { console.log("Model raw output:", result.output); return result; },
+  }
+  ```
+  This might be too verbose for production, but during development it helps understand what the model is doing. ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=Agent%20lifecycle%20hooks%20can%20be,dynamic%20control%20over%20the%20system)) ([Agents - AgentKit by Inngest](https://agentkit.inngest.com/concepts/agents#:~:text=lifecycle%3A%20,using%20Network%20state%20and%20history))
+- **Tool Handler Logs:** Within each tool’s handler, use `console.log` (or `step.log` if you have it in context) to record when it runs and what it receives/returns. For example, in `searchWebTool.handler`, log the query and maybe the length of results. This confirms that the tool was triggered and what it returned.
+- **Test Agents Individually:** If a particular agent is not behaving, try running it alone outside the network. For example:
+  ```ts
+  const res = await researchAgent.run("What is Inngest AgentKit?");
+  console.log(res);
+  ```
+  This can isolate issues with prompt or tool usage for that agent.
+- **Use the Inngest Dev Server UI:** When running locally with Inngest Dev Server, each function run (triggered by your event) will be listed. You can click into the run to see each step, logs, and even the payload. If your agent network throws an error (maybe a tool exception), it will show up there. This UI is very useful to replay runs or see error stacks. If something went wrong deep inside the agent loop, you might catch an exception or a timeout here.
+- **Tune System Prompts and Tools iteratively:** Often debugging means adjusting prompts or adding/removing tools. If the model is not calling the tool when it should, maybe the tool description isn’t clear or the system prompt isn’t encouraging it. You might need to experiment. Logging the model’s output (where it *would have* called a tool but maybe didn’t) can give clues. Sometimes the model might mention needing to do something but not actually invoke the tool due to confusion—tweaking the prompt can fix that.
+- **Simulate Tool Behavior:** In early development, if you don’t want to hit real APIs, you can stub tool handlers to return fixed data. This ensures your agent logic and routing can be tested without external variables. Once the flow is solid, integrate the real API calls.
+
+Finally, remember that **AI behavior is nondeterministic**. It’s helpful to run multiple times to see different outputs. Use deterministic routing (like our code router) to minimize unpredictability in flow. And when all else fails, step through the logic with simpler prompts to confirm each piece.
+
+## Real-Time Streaming vs. Background Jobs
+
+Depending on your application’s needs, you might want the AI’s response to stream to the user in real-time (token by token) or run entirely in the background and deliver when complete. Both approaches have trade-offs, and you can even implement a hybrid: quick answers stream, but long processes go to background.
+
+**Real-Time Streaming Interaction:**
+
+- *What it is:* The user sees the answer as it’s being generated (like ChatGPT or other live chat UIs). This typically means the request is kept open and the model’s tokens are sent as a stream.
+- *How to implement:* AgentKit itself doesn’t yet provide a high-level streaming API for the entire network, but you can achieve streaming by handling the model calls yourself. For example, if you have a simple case of one agent answering, you could use OpenAI’s streaming API in a Next.js route and forward chunks to the client. For multi-agent, it’s complex because the agent might call tools mid-way, which introduces pauses. However, you could still stream partial results. One approach:
+  - Use a **Server-Sent Events (SSE)** endpoint or WebSocket to push messages to the client as they are ready. When the Director agent finishes classification, you might send an SSE event “classified as technical”. When the Tech agent has an answer draft, stream that draft. Finally, stream the Supervisor’s polished answer.
+  - Or simpler, if your workflow is fairly fast (seconds), you might choose not to background it at all. Instead, call `network.run()` in an API route and stream the final answer. With Next.js 15 (app router), you can create a Route Handler that returns a `ReadableStream` of data. You’d run `network.run()` and as soon as you get the final text, stream it out chunk by chunk. But note, by the time `network.run` returns, you already have the full answer, so streaming is mainly beneficial if you can get partial output from the model in the middle of the run. AgentKit doesn’t currently expose token-level streaming, so essentially you’d get streaming only at the granularity of agent outputs or tool outputs.
+- *Considerations:* Real-time streaming ties up a server connection and isn’t suitable for very long processes (browsers may timeout after some tens of seconds or a couple minutes). It also means if the user disconnects, you might lose the result (unless you also save it). 
+
+**Background Job Mode:**
+
+- *What it is:* As we set up with Inngest, the work happens offline and the user is informed when it’s done (e.g., via notification or by checking back).
+- *Benefits:* It’s reliable (Inngest can retry failures, no concern about HTTP timeouts), and can handle long tasks (minutes or hours, especially if using human-in-the-loop or waiting steps ([Human in the Loop - AgentKit by Inngest](https://agentkit.inngest.com/advanced-patterns/human-in-the-loop#:~:text=%2F%2F%20Wait%20for%20developer%20response,))). It doesn’t hold a connection to the user.
+- *Drawbacks:* The user doesn’t get immediate feedback. You have to build a mechanism to deliver the result later (which could be as simple as showing a loading state and checking periodically).
+
+**Hybrid Approach:** Many applications use a mix. For relatively quick answers (< 10s), they do it interactively (maybe even without Inngest). For heavy tasks, they switch to background. You can implement a check: for example, if the question likely requires web research or coding (which can take longer), you enqueue via Inngest. If it’s something the agent can answer from knowledge (short and quick), you might call the model directly and stream. 
+
+In a Next.js context, you can also start showing a partial response from the agent while the rest is processing. For example, the Director agent could quickly respond with “I’m searching for the information...” which you stream, and then update with final answer.
+
+**Implementing Streaming in Next.js:** To stream a response from a Route Handler, you can do:
+
+```ts
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const question = searchParams.get("q")!;
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      // Write a prefix (optional)
+      controller.enqueue(encoder.encode("Answer: "));
+      // Run the agent network (background for a moment)
+      const result = await agentNetwork.run(question);
+      // Stream the result text (you could also chunk if needed)
+      controller.enqueue(encoder.encode(result));
+      controller.close();
+    }
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" }
+  });
+}
+```
+
+This simplistic example streams the final answer after it’s obtained. True token-by-token streaming would require the underlying model call to stream. If using OpenAI API directly, you could intercept the stream of tokens and forward them. With AgentKit, the model calls are handled by `step.ai` under the hood and returned in one chunk, so you don’t get token events directly. A possible workaround is to call the OpenAI API yourself with streaming in a custom tool or in place of `agent.run`, but that loses some of the built-in reliability.
+
+**UI Updates:** If using background mode, make sure to inform the user. Show a spinner or message like “Working on it... you will get your answer shortly.” If using streaming, show the partial text with a typing indicator.
+
+**Switching modes:** You can even allow the user to choose “fast mode” vs “detailed mode”, where one streams from a quick agent (maybe just GPT-3.5 without tools) and the other uses the full multi-agent workflow in background. Or use heuristics: e.g., if the search agent’s tool hasn’t finished in X seconds, you could send an interim update via SSE.
+
+In conclusion, for **immediate responsiveness**, use streaming with direct calls (if acceptable to block for a short time). For **complex workflows that benefit from Inngest’s orchestration**, use background mode and design a way to deliver results (polling or push). It’s not uncommon to combine them: e.g., quickly verify if the answer can be given from known info (if yes, stream it), otherwise fall back to background workflow and tell the user it might take longer.
+

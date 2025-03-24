@@ -1,0 +1,258 @@
+---
+description: Inngest Quick Start Guide
+globs: 
+alwaysApply: false
+---
+---
+description: Inngest Quick Start Guide
+globs: "**/*inngest*/**"
+alwaysApply: false
+---
+
+# Inngest Quick Start Guide
+
+This guide provides essential rules and conventions for working with Inngest in our Next.js application, focusing on consistent patterns and best practices.
+
+## Project Structure
+
+```
+├── app/api/inngest/route.ts    # Inngest API endpoint for function serving
+├── inngest/
+│   ├── client.ts               # Shared Inngest client
+│   ├── functions/              # Function definitions by domain
+│   │   ├── auth/               # Auth-related functions
+│   │   ├── agents/             # Agent-related functions
+│   │   └── ...                 # Other function domains
+│   ├── events.ts               # Event type definitions
+│   └── utils/                  # Shared utilities for functions
+└── .env.local                  # Environment variables
+```
+
+## Inngest Client Setup
+
+Always use the shared client from `inngest/client.ts`:
+
+```typescript
+// inngest/client.ts
+import { Inngest } from "inngest";
+
+// Define event interface 
+export interface Events {
+  "app/user.question": {
+    data: {
+      question: string;
+      userId?: string;
+    };
+  };
+  // Add other event types here
+}
+
+// Create and export the client
+export const inngest = new Inngest<Events>({ 
+  id: "my-app",
+  name: "My Application"
+});
+```
+
+## Function Naming Conventions
+
+1. Use descriptive, action-oriented names for functions.
+2. Follow the pattern: `<verb><noun>Workflow` or `<verb><noun>Function`.
+3. Group related functions in domain-specific files.
+
+```typescript
+// Good examples:
+processUserQuestionWorkflow
+generateReportFunction
+syncUserDataWorkflow
+```
+
+## Events Structure
+
+1. Use namespaced event names: `"domain/entity.action"`.
+2. Define event interfaces in `inngest/events.ts`.
+3. Include appropriate metadata with events.
+
+```typescript
+// Example event send:
+await inngest.send({
+  name: "app/user.question",
+  data: {
+    question: userInput,
+    userId: user.id,
+  },
+  // Optional user identification
+  user: { id: user.id },
+});
+```
+
+## Function Structure
+
+Each function should follow this pattern:
+
+```typescript
+export const myFunction = inngest.createFunction(
+  { 
+    id: "function-id-kebab-case",
+    name: "Human Readable Function Name",
+    // Optional concurrency/rate limiting
+    concurrency: 5,
+  },
+  { event: "app/entity.action" },  // Trigger on specific event
+  async ({ event, step }) => {
+    // Log important info
+    await step.log("Processing event", { eventId: event.id });
+    
+    // Use steps for each logical part of your function
+    const result = await step.run("descriptive-step-name", async () => {
+      return await someOperation();
+    });
+    
+    // Return output
+    return { success: true, data: result };
+  }
+);
+```
+
+## AgentKit Integration
+
+When using AgentKit with Inngest functions:
+
+1. Use environment variables for model configuration.
+2. Create agents outside the function to avoid recreating them on each invocation.
+3. Use step.run() for agent network execution to enable retries.
+
+```typescript
+import { createAgent, createNetwork } from "@inngest/agent-kit";
+import { openai } from "@inngest/ai";
+
+// Create agents outside function
+const agent = createAgent({
+  name: "Agent Name",
+  system: "System prompt",
+  model: openai({
+    model: process.env.OPENAI_MODEL || "gpt-4",
+    baseUrl: process.env.OPENAI_BASE_URL,
+    apiKey: process.env.OPENAI_API_KEY,
+  }),
+});
+
+// Function definition
+export const agentFunction = inngest.createFunction(
+  { id: "agent-workflow", name: "Agent Workflow" },
+  { event: "app/agent.trigger" },
+  async ({ event, step }) => {
+    // Run the agent in a step for durability
+    const result = await step.run("run-agent", async () => {
+      return await agent.run(event.data.input);
+    });
+    
+    return { output: result };
+  }
+);
+```
+
+## Error Handling
+
+Always implement error handling in functions:
+
+```typescript
+try {
+  const result = await step.run("risky-operation", async () => {
+    return await someRiskyOperation();
+  });
+  return { success: true, data: result };
+} catch (error) {
+  await step.log("Operation failed", { error: String(error) });
+  return { success: false, error: String(error) };
+}
+```
+
+## API Route Setup
+
+Always use this pattern for the Inngest API route:
+
+```typescript
+// app/api/inngest/route.ts
+import { serve } from "inngest/next";
+import { inngest } from "@/inngest/client";
+// Import all functions
+import { function1 } from "@/inngest/functions/domain1/function1";
+import { function2 } from "@/inngest/functions/domain2/function2";
+
+export const { GET, POST, PUT } = serve({
+  client: inngest,
+  functions: [
+    function1,
+    function2,
+    // Add all functions here
+  ],
+});
+```
+
+## Environment Variables
+
+Use these environment variables for Inngest configuration:
+
+```env
+# Inngest
+INNGEST_EVENT_KEY=                 # Your Inngest API key
+INNGEST_SIGNING_KEY=               # Your Inngest signing key
+
+# AI Models
+OPENAI_MODEL=gpt-4                 # Model to use
+OPENAI_BASE_URL=https://api.openai.com/v1  # Base URL for API
+OPENAI_API_KEY=sk-...              # API key
+```
+
+## Testing Functions
+
+For testing:
+
+1. Use the Inngest Dev Server for local development
+2. Test functions in isolation with mock events
+3. Verify steps execute as expected
+4. Check for appropriate error handling
+
+## Common Patterns
+
+### Sequential Steps
+
+For operations that must happen in sequence:
+
+```typescript
+const data1 = await step.run("step-1", async () => {
+  return await firstOperation();
+});
+
+const data2 = await step.run("step-2", async () => {
+  return await secondOperation(data1);
+});
+```
+
+### Parallel Steps
+
+For operations that can run in parallel:
+
+```typescript
+const [result1, result2] = await Promise.all([
+  step.run("parallel-1", async () => await operation1()),
+  step.run("parallel-2", async () => await operation2()),
+]);
+```
+
+### Conditional Logic
+
+For conditional execution paths:
+
+```typescript
+if (event.data.condition) {
+  await step.run("condition-true-path", async () => {
+    // Path if condition is true
+  });
+} else {
+  await step.run("condition-false-path", async () => {
+    // Path if condition is false
+  });
+}
+```
