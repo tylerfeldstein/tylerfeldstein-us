@@ -70,204 +70,70 @@ Before you begin, ensure you have the following installed:
    ```
 
 3. Set up environment variables:
+
    Create a `.env.local` file in the root directory with the following variables:
 
+   ```bash
+   # == CLERK == #
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+   CLERK_SECRET_KEY=your_clerk_secret_key
+   CLERK_JWT_ISSUER_DOMAIN=your_clerk_jwt_issuer_domain
+   # == END CLERK == #
+
+   # == CONVEX == #
+   # Deployment used by `npx convex dev`
+   CONVEX_DEPLOYMENT=dev:your_convex_deployment_id # team: your_team, project: your_project
+   NEXT_PUBLIC_CONVEX_URL=https://your_deployment_id.convex.cloud
+   # == END CONVEX == #
+
+   # == APP == #
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   JWT_SECRET=your_secret_key_for_chat_tokens
+   # == END APP == #
    ```
-   # Convex (Self-hosted)
-   CONVEX_SELF_HOSTED_URL='http://127.0.0.1:3210'
-   CONVEX_SELF_HOSTED_ADMIN_KEY='convex-self-hosted|your_admin_key'
-   NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210
 
-   # Clerk Authentication
-   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key
-   CLERK_SECRET_KEY=sk_test_your_clerk_secret_key
+   You'll need to create accounts and get API keys from:
+   - [Clerk](https://clerk.com) for authentication
+   - [Convex](https://convex.dev) for the backend database
 
-   # Required for Clerk JWT authentication with Convex
-   CLERK_JWT_ISSUER_DOMAIN=https://your-domain.clerk.accounts.dev
-   ```
-
-   > Note: For Clerk values, sign up at [clerk.dev](https://clerk.dev) and create an application to get your API keys.
-
-### Development Environment Setup
-
-1. Start the Next.js development server:
+4. Start the development environment:
 
    ```bash
+   # Start the Convex backend
+   pnpm convex dev
+
+   # In a new terminal, start the Next.js frontend
    pnpm dev
+
+   # In a new terminal, start Inngest for background jobs
+   npx inngest-cli@latest dev -u http://localhost:3000/api/inngest
    ```
 
-2. In a separate terminal, start Convex:
+   Your app should now be running at [http://localhost:3000](http://localhost:3000)
 
-   ```bash
-   npx convex dev
-   ```
+## Convex Environment Variables
 
-   To configure Convex with your environment variables:
+Convex requires environment variables to be set using the Convex CLI. This is particularly important for the JWT issuer domain:
 
-   ```bash
-   # Set up Clerk JWT auth provider in Convex
-   npx convex env set CLERK_JWT_ISSUER_DOMAIN
+```bash
+# Set environment variables in Convex
+npx convex env set CLERK_JWT_ISSUER_DOMAIN "your_clerk_jwt_issuer_domain"
 
-   # Verify your environment variables are set
-   npx convex env list
-   ```
+# List all environment variables
+npx convex env ls
 
-3. In another terminal, start Inngest:
-
-   ```bash
-   npx inngest-cli dev
-   ```
-
-4. Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
-
-### Additional Commands
-
-- Generate Convex types after schema changes:
-
-  ```bash
-  npx convex codegen
-  ```
-
-- Build for production:
-  ```bash
-  pnpm build
-  ```
-
-## Features
-
-- **Real-time data updates** via Convex
-- **Authentication** with Clerk
-- **Responsive UI** with Tailwind CSS and Shadcn components
-- **Dark mode support** with theme toggle
-- **Background processing** for complex operations with Inngest
-- **Real-time Inngest functions streaming** via Server Actions (no API routes needed)
-
-## Inngest Real-time Streaming
-
-The application uses Next.js 15 Server Actions to handle real-time streaming from Inngest functions:
-
-1. **Server Action**: The `getInngestStream` server action in `app/actions/inngest.ts` subscribes to Inngest real-time channels and returns a ReadableStream.
-
-2. **Client Hook**: The `useInngestRealtime` hook connects to the server action and processes the stream data, providing real-time updates to components.
-
-3. **Usage**: Components can use the hook to display real-time updates by providing a correlation ID:
-
-   ```tsx
-   const { results, isConnected, error } = useInngestRealtime(correlationId);
-   ```
-
-This approach uses native Next.js 15 features, avoiding API routes for better performance and maintainability.
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add some amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-## License
-
-Dont steal my shit
-
-# Secure Chat with HTTP-Only Cookies
-
-> **Note**: This is the current implementation for secure chat authentication. We've transitioned from the previous localStorage-based approach to this more secure HTTP-only cookie system.
-
-This project implements a secure chat system using JWT tokens stored in HTTP-only cookies for enhanced security.
-
-## Security Features
-
-- **HTTP-Only Cookies**: Prevents client-side JavaScript from accessing token values
-- **Short-Lived Access Tokens**: Access tokens expire quickly to minimize security risks
-- **Refresh Token Rotation**: Longer-lived refresh tokens enable seamless re-authentication
-- **Server-Side Token Verification**: Token validation happens on the server
-
-## Implementation
-
-The implementation consists of:
-
-1. **Server Actions** (`/actions/auth/cookieTokens.ts`):
-   - Set and clear HTTP-only cookies
-   - Refresh access tokens using refresh tokens
-   - Get token existence status safely
-
-2. **React Hook** (`/hooks/useChatCookieTokens.ts`):
-   - Client-side interface to the cookie token system
-   - Manages token generation, refreshing, and clearing
-   - Tracks token status for UI updates
-
-3. **Convex Functions** (`/convex/jwt.ts`):
-   - Generate and verify JWT tokens
-   - Store token information in database
-   - Enable token invalidation
-
-## Usage
-
-### In Client Components
-
-```tsx
-'use client';
-
-import { useChatCookieTokens } from "@/hooks/useChatCookieTokens";
-
-export default function ChatComponent() {
-  const { 
-    hasToken, 
-    isRefreshing, 
-    generateChatTokens, 
-    refreshToken, 
-    clearTokens 
-  } = useChatCookieTokens();
-
-  // Generate tokens on chat access
-  const handleChatAccess = async () => {
-    const success = await generateChatTokens();
-    if (success) {
-      // Navigate to chat or load chat data
-    }
-  };
-
-  // Clear tokens on logout
-  const handleLogout = async () => {
-    await clearTokens();
-    // Navigate to login page
-  };
-
-  return (
-    <div>
-      <button onClick={handleChatAccess}>Access Chat</button>
-      <button onClick={handleLogout}>Logout</button>
-    </div>
-  );
-}
+# Get a specific environment variable
+npx convex env get CLERK_JWT_ISSUER_DOMAIN
 ```
 
-### In Server Components or Actions
+Make sure the `CLERK_JWT_ISSUER_DOMAIN` in Convex matches the one in your `.env.local` file.
 
-```tsx
-import { getTokensForServerUse } from "@/actions/auth/cookieTokens";
+## Deployment
 
-export async function YourServerAction() {
-  // Get tokens for server-side API calls
-  const { accessToken, refreshToken } = await getTokensForServerUse();
-  
-  if (accessToken) {
-    // Make authenticated API call with token
-  } else {
-    // Handle unauthenticated state
-  }
-}
-```
+To deploy your application:
 
-## Security Benefits
+1. Push your code to a Git repository
+2. Set up hosting with Vercel or similar platform
+3. Configure environment variables on your hosting platform
+4. Deploy your Convex backend with `npx convex deploy`
 
-- Prevents XSS attacks from stealing tokens
-- Reduces risk of CSRF attacks when proper configurations are applied
-- Automatically expires tokens to limit attack window
-- Maintains better security in development environments
-
-## Development vs Production
-
-- Development: Cookies work without HTTPS
-- Production: Adds `secure: true` flag to ensure cookies only work over HTTPS
