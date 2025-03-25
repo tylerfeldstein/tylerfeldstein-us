@@ -63,14 +63,14 @@ export default function Home() {
       
       {/* Consulting Rates Section */}
       <div id="consulting" className="w-full relative z-38 mt-[-2vw]">
-        <PageSection className="relative z-10 pt-[calc(2vw+4rem)] py-50">
+        <PageSection className="relative z-10 pt-[calc(2vw+4rem)] pb-0">
           <ConsultingRatesSection />
         </PageSection>
       </div>
       
       {/* CTA section with counter gradient */}
       <div id="contact" className="w-full relative z-40">
-        <PageSection className="relative z-10">
+        <PageSection className="relative z-10 pt-0">
           <CtaSection />
         </PageSection>
       </div>

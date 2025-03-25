@@ -42,7 +42,7 @@ const CtaSection = () => {
   };
 
   return (
-    <section className="bg-background dark:bg-gradient-to-b from-background/95 to-background/70 py-16 sm:py-20 border-t border-border">
+    <section className="bg-background dark:bg-gradient-to-b from-background/95 to-background/70 py-16 pt-8 sm:py-20 sm:pt-8 border-t border-border">
       <div className="container px-4 md:px-6 mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
           <div>
