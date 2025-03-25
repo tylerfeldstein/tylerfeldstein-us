@@ -25,6 +25,7 @@ const config: Config = {
         "shine": "shine 15s cubic-bezier(0.4, 0, 0.2, 1) infinite",
         "rotate-slow": "rotate 30s linear infinite",
         "rotate-slow-reverse": "rotate 40s linear infinite reverse",
+        "pulse-slow": "pulse 8s cubic-bezier(0.4, 0, 0.6, 1) infinite",
       },
       keyframes: {
         "slide-down": {
@@ -99,12 +100,19 @@ const config: Config = {
         "rotate": {
           "0%": { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(360deg)" }
+        },
+        "pulse": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.5", transform: "scale(0.95)" }
         }
       },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
       },
+      transitionDelay: {
+        '2000': '2000ms',
+      }
     },
   },
   plugins: [heroui()],

@@ -3,6 +3,8 @@
 import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
 
 // Career data with most recent first
 const careerData = [
@@ -63,6 +65,24 @@ const careerData = [
 ];
 
 const CareerSections = () => {
+  const { isSignedIn, isLoaded } = useUser();
+  const router = useRouter();
+  
+  // Handle contact button click based on authentication state
+  const handleContactClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    
+    if (isLoaded) {
+      if (isSignedIn) {
+        // User is signed in, navigate directly to messages
+        router.push('/messages');
+      } else {
+        // User is not signed in, show sign-in modal with return URL
+        router.push('/?showSignIn=true&returnTo=/messages');
+      }
+    }
+  };
+
   return (
     <section className="py-16">
       {/* Introduction */}
@@ -233,6 +253,7 @@ const CareerSections = () => {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           className="px-6 md:px-8 py-3 bg-primary text-white rounded-md font-medium"
+          onClick={handleContactClick}
         >
           Contact Me
         </motion.button>
