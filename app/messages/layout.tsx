@@ -8,6 +8,7 @@ import MessagesNavbar from "@/components/MessagesNavbar";
 import { motion, AnimatePresence } from "framer-motion";
 import { LoadingScreen } from "@/components/loaders/LoadingScreen";
 import "./mobile-safe-area.css";
+import Head from "next/head";
 
 export default function MessagesLayout({
   children,
@@ -20,6 +21,29 @@ export default function MessagesLayout({
   const [showLoadingState, setShowLoadingState] = useState(false);
   const [loadingStage, setLoadingStage] = useState<'initial' | 'authenticating' | 'connecting'>('initial');
   const [loadingPhase, setLoadingPhase] = useState(0);
+
+  // Add viewport meta tag to prevent zoom issues on mobile devices
+  useEffect(() => {
+    // Check if we need to create or update the viewport meta tag
+    let viewportMeta = document.querySelector('meta[name="viewport"]');
+    
+    if (!viewportMeta) {
+      // Create a new viewport meta tag if it doesn't exist
+      viewportMeta = document.createElement('meta');
+      viewportMeta.setAttribute('name', 'viewport');
+      document.head.appendChild(viewportMeta);
+    }
+    
+    // Set the content with settings that prevent auto-zoom on input focus
+    viewportMeta.setAttribute('content', 
+      'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover');
+    
+    // Clean up function
+    return () => {
+      // Optional: restore default viewport settings when component unmounts
+      // though typically this isn't necessary for a layout component
+    };
+  }, []);
 
   // Cycle through loading messages for a better UX
   useEffect(() => {

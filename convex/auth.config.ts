@@ -6,8 +6,8 @@ const authConfig = {
       // or with `process.env.CLERK_JWT_ISSUER_DOMAIN`
       // and configure CLERK_JWT_ISSUER_DOMAIN on the Convex Dashboard
       // See https://docs.convex.dev/auth/clerk#configuring-dev-and-prod-instances
-      //domain: "https://classic-llama-88.clerk.accounts.dev",
-      domain: "https://clerk.tylerfeldstein.us",
+      domain: "https://classic-llama-88.clerk.accounts.dev",
+      //domain: "https://clerk.tylerfeldstein.us",
       applicationID: "convex",
     },
   ],
