@@ -3,12 +3,11 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useChatCookieTokens } from "@/hooks/useChatCookieTokens";
 import MessagesNavbar from "@/components/MessagesNavbar";
 import { motion, AnimatePresence } from "framer-motion";
 import { LoadingScreen } from "@/components/loaders/LoadingScreen";
+import "./mobile-safe-area.css";
 
 export default function MessagesLayout({
   children,
@@ -17,7 +16,6 @@ export default function MessagesLayout({
 }) {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
-  const currentUser = useQuery(api.users.getMe);
   const { hasToken, generateChatTokens } = useChatCookieTokens();
   const [showLoadingState, setShowLoadingState] = useState(false);
   const [loadingStage, setLoadingStage] = useState<'initial' | 'authenticating' | 'connecting'>('initial');

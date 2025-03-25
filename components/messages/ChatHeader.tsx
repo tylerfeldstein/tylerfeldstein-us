@@ -113,12 +113,12 @@ export function ChatHeader({
   
   return (
     <div className={cn(
-      "h-14 md:h-16 flex items-center justify-between px-3 sm:px-4 py-2 sticky top-0 z-20 backdrop-blur-sm",
+      "h-14 md:h-16 flex items-center justify-between px-2 sm:px-4 py-2 sticky top-0 z-20 backdrop-blur-sm",
       resolvedTheme === "dark" ? "from-[#1a0920]/90 via-[#220a2a]/70 to-transparent" : "from-blue-50/90 via-blue-50/70 to-transparent0"
     )}>
       {/* Mobile back button */}
       {isMobile && (
-        <Button variant="ghost" size="icon" onClick={onBackClick} className="mr-2 flex-shrink-0">
+        <Button variant="ghost" size="icon" onClick={onBackClick} className="mr-1 sm:mr-2 flex-shrink-0 h-10 w-10">
           <ArrowLeftIcon className="h-5 w-5" />
         </Button>
       )}
@@ -143,28 +143,29 @@ export function ChatHeader({
       <div className="flex items-center gap-0.5 sm:gap-2 flex-shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9">
-              <MoreVerticalIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+            <Button variant="ghost" size="icon" className="h-10 w-10 sm:h-10 sm:w-10">
+              <MoreVerticalIcon className="h-5 w-5 sm:h-5 sm:w-5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Chat Options</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/settings")}>
+            <DropdownMenuItem onClick={() => router.push("/settings")}
+              className="h-10 cursor-pointer">
               <Settings className="mr-2 h-4 w-4" />
               Settings
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem className="h-10 cursor-pointer">
               <UserPlusIcon className="mr-2 h-4 w-4" />
               <span>Add People</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem className="h-10 cursor-pointer">
               <Info className="mr-2 h-4 w-4" />
               <span>Chat Info</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
-              className="text-destructive focus:text-destructive" 
+              className="text-destructive focus:text-destructive h-10 cursor-pointer" 
               onClick={handleDeleteChat}
             >
               <Trash2Icon className="mr-2 h-4 w-4" />

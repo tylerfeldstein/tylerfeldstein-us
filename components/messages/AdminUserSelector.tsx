@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

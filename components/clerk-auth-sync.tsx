@@ -26,15 +26,15 @@ export function ClerkAuthSync() {
   
   // Debug logging for authentication states - always log
   useEffect(() => {
-    console.log("Auth states:", { 
-      isClerkLoaded, 
-      isSignedIn, 
-      hasUser: !!user, 
-      userId: user?.id,
-      userEmail: user?.emailAddresses[0]?.emailAddress,
-      isConvexAuthenticated,
-      isConvexLoading 
-    });
+    // console.log("Auth states:", { 
+    //   isClerkLoaded, 
+    //   isSignedIn, 
+    //   hasUser: !!user, 
+    //   userId: user?.id,
+    //   userEmail: user?.emailAddresses[0]?.emailAddress,
+    //   isConvexAuthenticated,
+    //   isConvexLoading 
+    // });
   }, [isClerkLoaded, isSignedIn, user, isConvexAuthenticated, isConvexLoading]);
   
   // Reference to track previous signed in state to detect changes

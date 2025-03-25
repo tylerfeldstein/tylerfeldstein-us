@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +11,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 import { LogOut, User, ChevronLeft, MessageCircle } from "lucide-react";
 import { ModeToggle } from "@/components/ModeToggle";
 import Image from 'next/image';
@@ -23,7 +21,6 @@ import { Button } from "@/components/ui/button";
 export default function MessagesNavbar() {
   const { isSignedIn, user } = useUser();
   const clerk = useClerk();
-  const router = useRouter();
 
   const handleLogout = () => {
     clerk.signOut();

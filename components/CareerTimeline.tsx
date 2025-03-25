@@ -1,11 +1,10 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence, MotionValue } from 'framer-motion';
+import { motion, useScroll, useTransform, MotionValue } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { useInView } from 'react-intersection-observer';
-import confetti from 'canvas-confetti';
 
 // Career data from resume in reverse chronological order (most recent first)
 const careerData = [
@@ -97,7 +96,7 @@ const careerData = [
 const CareerCard = ({ data, progress }: { data: typeof careerData[0], progress: MotionValue<number> }) => {
   return (
     <motion.div
-      className="flex items-center justify-center h-screen w-full absolute inset-0"
+      className="flex items-center justify-center h-full w-full absolute inset-0"
       style={{ 
         opacity: progress,
         pointerEvents: "auto"
@@ -107,20 +106,20 @@ const CareerCard = ({ data, progress }: { data: typeof careerData[0], progress: 
         <CardHeader className="pb-2">
           <div className="flex justify-between items-start flex-wrap gap-2">
             <div>
-              <CardTitle className="text-3xl font-bold text-foreground">{data.title}</CardTitle>
-              <p className="text-xl text-primary mt-1">{data.company}</p>
+              <CardTitle className="text-2xl md:text-3xl font-bold text-foreground">{data.title}</CardTitle>
+              <p className="text-lg md:text-xl text-primary mt-1">{data.company}</p>
             </div>
-            <Badge variant="outline" className="text-lg text-muted-foreground border-border font-medium">
+            <Badge variant="outline" className="text-base md:text-lg text-muted-foreground border-border font-medium">
               {data.period}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
-          <ul className="list-disc pl-5 space-y-4 text-foreground/90">
+          <ul className="list-disc pl-5 space-y-2 md:space-y-3 text-foreground/90">
             {data.highlights.map((highlight, idx) => (
               <motion.li 
                 key={idx}
-                className="text-lg"
+                className="text-base md:text-lg"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ 
                   opacity: 1,
@@ -141,7 +140,7 @@ const CareerCard = ({ data, progress }: { data: typeof careerData[0], progress: 
 const CareerTimeline = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [hasTriggeredConfetti, setHasTriggeredConfetti] = useState(false);
-  const [headerRef, headerInView] = useInView({
+  const [headerRef] = useInView({
     threshold: 0.5,
     triggerOnce: false
   });
@@ -152,28 +151,28 @@ const CareerTimeline = () => {
     offset: ["start start", "end start"]
   });
 
-  // Progress values for each career card
-  const card1Progress = useTransform(scrollYProgress, [0, 0.1, 0.2], [1, 1, 0]);
-  const card2Progress = useTransform(scrollYProgress, [0.1, 0.2, 0.3], [0, 1, 0]);
-  const card3Progress = useTransform(scrollYProgress, [0.2, 0.3, 0.4], [0, 1, 0]);
-  const card4Progress = useTransform(scrollYProgress, [0.3, 0.4, 0.5], [0, 1, 0]);
-  const card5Progress = useTransform(scrollYProgress, [0.4, 0.5, 0.6], [0, 1, 0]);
-  const card6Progress = useTransform(scrollYProgress, [0.5, 0.6, 0.7], [0, 1, 0]);
+  // Tighter progress values for each career card to create overlap
+  const card1Progress = useTransform(scrollYProgress, [0, 0.05, 0.15], [1, 1, 0]);
+  const card2Progress = useTransform(scrollYProgress, [0.05, 0.15, 0.25], [0, 1, 0]);
+  const card3Progress = useTransform(scrollYProgress, [0.15, 0.25, 0.35], [0, 1, 0]);
+  const card4Progress = useTransform(scrollYProgress, [0.25, 0.35, 0.45], [0, 1, 0]);
+  const card5Progress = useTransform(scrollYProgress, [0.35, 0.45, 0.55], [0, 1, 0]);
+  const card6Progress = useTransform(scrollYProgress, [0.45, 0.55, 0.65], [0, 1, 0]);
   const cardProgressValues = [
     card1Progress, card2Progress, card3Progress, 
     card4Progress, card5Progress, card6Progress
   ];
 
   // Header animations
-  const headerOpacity = useTransform(scrollYProgress, [0, 0.05, 0.1], [1, 1, 0]);
+  const headerOpacity = useTransform(scrollYProgress, [0, 0.03, 0.08], [1, 1, 0]);
   
   useEffect(() => {
     const unsubscribe = scrollYProgress.on("change", (progress) => {
       // Trigger confetti when nearing end
-      if (progress > 0.65 && !hasTriggeredConfetti) {
+      if (progress > 0.6 && !hasTriggeredConfetti) {
         setHasTriggeredConfetti(true);
         triggerConfetti();
-      } else if (progress < 0.6 && hasTriggeredConfetti) {
+      } else if (progress < 0.55 && hasTriggeredConfetti) {
         setHasTriggeredConfetti(false);
       }
     });
@@ -224,7 +223,7 @@ const CareerTimeline = () => {
       <motion.div 
         ref={headerRef}
         style={{ opacity: headerOpacity }}
-        className="sticky top-0 z-10 h-screen w-full flex flex-col items-center justify-center"
+        className="sticky top-0 z-10 h-[50vh] w-full flex flex-col items-center justify-center"
       >
         <div className="text-center max-w-xl mx-auto px-4">
           <h2 className="text-5xl font-bold tracking-tight text-foreground mb-4">
@@ -258,17 +257,18 @@ const CareerTimeline = () => {
         </div>
       </motion.div>
 
-      {/* Career cards - each takes up full viewport height */}
+      {/* Career cards - each takes up 60vh instead of full viewport height */}
       {careerData.map((career, index) => (
-        <CareerCard
-          key={career.id}
-          data={career}
-          progress={cardProgressValues[index]}
-        />
+        <div key={career.id} className="h-[60vh] relative">
+          <CareerCard
+            data={career}
+            progress={cardProgressValues[index]}
+          />
+        </div>
       ))}
 
-      {/* Spacer to ensure we have enough scroll room */}
-      <div className="h-screen"></div>
+      {/* Reduced spacer height */}
+      <div className="h-[30vh]"></div>
     </div>
   );
 };

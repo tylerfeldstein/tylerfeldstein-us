@@ -24,9 +24,38 @@ export function MessageInput({ chatId }: MessageInputProps) {
   const { resolvedTheme } = useTheme();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useUser();
+  const [safeAreaBottom, setSafeAreaBottom] = useState<number>(0);
 
   const sendMessage = useMutation(api.secureMessages.sendMessageSecure);
   const setTypingStatus = useMutation(api.secureMessages.setTypingStatusSecure);
+
+  // Update viewport and safe area measurements
+  useEffect(() => {
+    const updateViewportMeasurements = () => {
+      // Get visual viewport height
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      
+      // Estimate safe area bottom on iOS
+      // Default iOS toolbar height is roughly 83px in Safari
+      const estimatedSafeBottom = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 
+        Math.max(window.innerHeight - vh, 0) : 0;
+      setSafeAreaBottom(estimatedSafeBottom);
+    };
+
+    // Initial measurement
+    updateViewportMeasurements();
+    
+    // Update on resize and scroll
+    window.visualViewport?.addEventListener('resize', updateViewportMeasurements);
+    window.visualViewport?.addEventListener('scroll', updateViewportMeasurements);
+    window.addEventListener('resize', updateViewportMeasurements);
+    
+    return () => {
+      window.visualViewport?.removeEventListener('resize', updateViewportMeasurements);
+      window.visualViewport?.removeEventListener('scroll', updateViewportMeasurements);
+      window.removeEventListener('resize', updateViewportMeasurements);
+    };
+  }, []);
 
   // Auto resize textarea
   useEffect(() => {
@@ -203,9 +232,15 @@ export function MessageInput({ chatId }: MessageInputProps) {
   const isDarkTheme = resolvedTheme === "dark";
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 w-full">
+    <div 
+      className="fixed left-0 right-0 w-full" 
+      style={{ 
+        bottom: `${safeAreaBottom}px`,
+        zIndex: 30
+      }}
+    >
       <div className={cn(
-        "px-2 sm:px-4 md:px-8 pb-4 md:pb-6 pt-10",
+        "px-2 sm:px-4 md:px-8 pb-3 pb-safe sm:pb-4 md:pb-6 pt-8 sm:pt-10",
         "bg-gradient-to-t",
         isDarkTheme 
           ? "from-[#1a0920]/90 via-[#220a2a]/70 to-transparent" 
@@ -259,7 +294,7 @@ export function MessageInput({ chatId }: MessageInputProps) {
                       variant="ghost"
                       size="icon"
                       className={cn(
-                        "h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-colors",
+                        "h-9 w-9 sm:h-9 sm:w-9 rounded-xl transition-colors",
                         isDarkTheme 
                           ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" 
                           : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
@@ -283,7 +318,7 @@ export function MessageInput({ chatId }: MessageInputProps) {
                       variant="ghost"
                       size="icon"
                       className={cn(
-                        "h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-colors",
+                        "h-9 w-9 sm:h-9 sm:w-9 rounded-xl transition-colors",
                         isDarkTheme 
                           ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" 
                           : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
@@ -306,9 +341,9 @@ export function MessageInput({ chatId }: MessageInputProps) {
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.8, opacity: 0 }}
-                    className="h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center"
+                    className="h-10 w-10 sm:h-10 sm:w-10 flex items-center justify-center"
                   >
-                    <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin text-primary" />
+                    <Loader2 className="h-5 w-5 sm:h-5 sm:w-5 animate-spin text-primary" />
                   </motion.div>
                 ) : (
                   <motion.div
@@ -321,12 +356,12 @@ export function MessageInput({ chatId }: MessageInputProps) {
                       type="submit" 
                       size="icon" 
                       className={cn(
-                        "h-9 w-9 sm:h-10 sm:w-10 rounded-xl shadow-sm",
+                        "h-10 w-10 sm:h-10 sm:w-10 rounded-xl shadow-sm",
                         !message.trim() && "opacity-50 cursor-not-allowed"
                       )}
                       disabled={!message.trim() || isSubmitting}
                     >
-                      <Send className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <Send className="h-5 w-5 sm:h-5 sm:w-5" />
                       <span className="sr-only">Send</span>
                     </Button>
                   </motion.div>

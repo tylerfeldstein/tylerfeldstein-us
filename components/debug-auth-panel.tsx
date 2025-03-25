@@ -20,8 +20,8 @@ export function DebugAuthPanel() {
   const { user } = useUser();
   const { isAuthenticated: isConvexAuthenticated, isLoading: isConvexLoading } = useConvexAuth();
   const { convexUser } = useConvexUser();
-  const [syncResult, setSyncResult] = useState<any>(null);
-  const [debugResult, setDebugResult] = useState<any>(null);
+  const [syncResult, setSyncResult] = useState<Record<string, unknown> | null>(null);
+  const [debugResult, setDebugResult] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

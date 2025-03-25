@@ -2,18 +2,11 @@
 
 import React from 'react';
 import { 
-  ActivityIcon, 
-  ServerIcon, 
-  SmartphoneIcon,
-  DatabaseIcon,
-  CloudIcon,
   ShieldIcon,
   BrainIcon,
   CodeIcon,
-  LockIcon,
   NetworkIcon,
   AlertCircleIcon,
-  CommandIcon,
   GlobeIcon,
   BotIcon,
   HardDriveIcon,
@@ -71,7 +64,7 @@ const expertiseItems = [
 
 const ExpertiseSection = () => {
   return (
-    <section className="py-8 relative z-20">
+    <section className="pt-8 relative z-20">
       <div className="container px-4 md:px-6 mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tighter mb-2 text-foreground">

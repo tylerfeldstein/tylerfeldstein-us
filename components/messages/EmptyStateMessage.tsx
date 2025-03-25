@@ -9,14 +9,14 @@ interface EmptyStateMessageProps {
 
 export function EmptyStateMessage({ onNewChat }: EmptyStateMessageProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
         className="max-w-md mx-auto"
       >
-        <div className="mb-6">
+        <div className="mb-5 sm:mb-6">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -25,16 +25,16 @@ export function EmptyStateMessage({ onNewChat }: EmptyStateMessageProps) {
               type: "spring",
               stiffness: 200
             }}
-            className="mx-auto h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4"
+            className="mx-auto h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4"
           >
-            <MessageSquare className="h-8 w-8 text-primary" />
+            <MessageSquare className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
           </motion.div>
           
           <motion.h3 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="text-xl font-semibold mb-2"
+            className="text-lg sm:text-xl font-semibold mb-2"
           >
             Start a Conversation
           </motion.h3>
@@ -43,7 +43,7 @@ export function EmptyStateMessage({ onNewChat }: EmptyStateMessageProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
-            className="text-muted-foreground"
+            className="text-sm sm:text-base text-muted-foreground"
           >
             Select an existing chat or start a new conversation
           </motion.p>
@@ -56,7 +56,7 @@ export function EmptyStateMessage({ onNewChat }: EmptyStateMessageProps) {
         >
           <Button 
             onClick={onNewChat}
-            className="gap-2"
+            className="gap-2 h-10 px-4 sm:px-5"
             size="lg"
           >
             <span>New Conversation</span>
@@ -68,7 +68,7 @@ export function EmptyStateMessage({ onNewChat }: EmptyStateMessageProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
-          className="mt-8 text-xs text-muted-foreground/70 max-w-xs mx-auto"
+          className="mt-6 sm:mt-8 text-xs text-muted-foreground/70 max-w-xs mx-auto"
         >
           Your conversations are end-to-end encrypted and visible only to participants
         </motion.div>

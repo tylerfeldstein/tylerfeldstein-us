@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { usePathname } from "next/navigation";
 import {
   Sheet,
   SheetContent,
@@ -20,11 +19,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { LogOut, Settings, User, MessageSquare, Menu, ChevronDown } from "lucide-react";
+import { LogOut, User, MessageSquare, Menu, ChevronDown } from "lucide-react";
 import { ModeToggle } from "@/components/ModeToggle";
 import { useState, useEffect } from "react";
 import Image from 'next/image';
-import { useTheme } from "next-themes";
 
 interface NavItem {
   title: string;
@@ -103,8 +101,6 @@ const mainNavItems: NavItem[] = [
 export default function ShadcnNavbar() {
   const { isSignedIn, user } = useUser();
   const clerk = useClerk();
-  const pathname = usePathname();
-  const { theme } = useTheme();
   
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("home");

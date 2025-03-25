@@ -23,7 +23,7 @@ export default function ChatList({ isCollapsed = false }: ChatListProps) {
   
   useEffect(() => {
     if (Array.isArray(chats)) {
-      console.log(`[ChatList] Loaded ${chats.length} chats`);
+      // console.log(`[ChatList] Loaded ${chats.length} chats`);
       
       if (chats.length > 0) {
         // Log details of first few chats

@@ -2,8 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ShieldCheck, Server, Cpu, BarChart4, Zap } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ShieldCheck, Cpu, BarChart4, Zap } from 'lucide-react';
 
 // Animation variants
 const containerVariants = {

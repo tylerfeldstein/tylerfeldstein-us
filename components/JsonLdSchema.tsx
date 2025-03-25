@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface JsonLdProps {
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 const JsonLdSchema: React.FC<JsonLdProps> = ({ data }) => {

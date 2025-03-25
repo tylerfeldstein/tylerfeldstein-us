@@ -7,7 +7,6 @@ import { Id } from "@/convex/_generated/dataModel";
 import { useUser } from "@clerk/nextjs";
 import { format } from "date-fns";
 import { useTheme } from "next-themes";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,10 +14,17 @@ import { CheckIcon, ClockIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PinWheel } from "@/components/loaders/pinwheel";
-import { Button } from "@/components/ui/button";
-import { ChevronDown } from "lucide-react";
 import NewMessageIndicator from "./NewMessageIndicator";
 import TypingIndicator from "./TypingIndicator";
+
+// Import the TypingUser interface for correct typing
+interface TypingUser {
+  userId: string;
+  name?: string;
+  email?: string;
+  imageUrl?: string;
+  lastUpdated: number;
+}
 
 interface MessageListProps {
   chatId: Id<"chats">;
@@ -82,7 +88,6 @@ export function MessageList({ chatId }: MessageListProps) {
   const chatQuery = useQuery(api.messages.getChat, { chatId });
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [typing, setTyping] = useState(false);
   
   // State to track if user has scrolled up and isn't at the bottom
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -96,51 +101,6 @@ export function MessageList({ chatId }: MessageListProps) {
   
   // Create a ref for the scroll container
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Function to scroll to bottom smoothly
-  const scrollToBottom = ({ behavior = 'smooth' }: { behavior: ScrollBehavior }) => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior });
-      setIsAtBottom(true);
-      setHasNewUnreadMessages(false);
-      
-      // When scrolling to bottom, update the previous message count
-      // to prevent false "new messages" notifications
-      prevMessageCountRef.current = messages.length;
-      
-      // Mark messages as read when scrolling to bottom
-      markMessagesAsReadIfNeeded();
-    }
-  };
-
-  // Function to check if user is at bottom of chat
-  const checkIfAtBottom = useCallback(() => {
-    if (containerRef.current) {
-      // Look for the first direct child that has overflow-y-auto
-      const scrollableElement = containerRef.current.querySelector('.overflow-y-auto');
-      if (scrollableElement) {
-        const { scrollTop, scrollHeight, clientHeight } = scrollableElement as HTMLElement;
-        // Consider "at bottom" if within 100px of the bottom
-        const atBottom = scrollHeight - scrollTop - clientHeight < 100;
-        
-        // Only update state if the value has changed to avoid re-renders
-        if (atBottom !== isAtBottom) {
-          setIsAtBottom(atBottom);
-          
-          // If user manually scrolled to the bottom, clear the new messages notification
-          if (atBottom) {
-            setHasNewUnreadMessages(false);
-            
-            // Mark messages as read when user scrolls to bottom
-            markMessagesAsReadIfNeeded();
-          }
-        }
-        
-        return atBottom;
-      }
-    }
-    return true;
-  }, [isAtBottom]);
   
   // Function to mark messages as read, with debouncing
   const markMessagesAsReadIfNeeded = useCallback(() => {
@@ -170,13 +130,58 @@ export function MessageList({ chatId }: MessageListProps) {
     });
   }, [chatId, user?.id, markMessagesAsRead]);
   
+  // Function to scroll to bottom smoothly
+  const scrollToBottom = useCallback(({ behavior = 'smooth' }: { behavior: ScrollBehavior }) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior });
+      setIsAtBottom(true);
+      setHasNewUnreadMessages(false);
+      
+      // When scrolling to bottom, update the previous message count
+      // to prevent false "new messages" notifications
+      prevMessageCountRef.current = messages.length;
+      
+      // Mark messages as read when scrolling to bottom
+      markMessagesAsReadIfNeeded();
+    }
+  }, [messages.length, markMessagesAsReadIfNeeded]);
+
+  // Function to check if user is at bottom of chat
+  const checkIfAtBottom = useCallback(() => {
+    if (containerRef.current) {
+      // Look for the first direct child that has overflow-y-auto
+      const scrollableElement = containerRef.current.querySelector('.overflow-y-auto');
+      if (scrollableElement) {
+        const { scrollTop, scrollHeight, clientHeight } = scrollableElement as HTMLElement;
+        // Consider "at bottom" if within 100px of the bottom
+        const atBottom = scrollHeight - scrollTop - clientHeight < 100;
+        
+        // Only update state if the value has changed to avoid re-renders
+        if (atBottom !== isAtBottom) {
+          setIsAtBottom(atBottom);
+          
+          // If user manually scrolled to the bottom, clear the new messages notification
+          if (atBottom) {
+            setHasNewUnreadMessages(false);
+            
+            // Mark messages as read when user scrolls to bottom
+            markMessagesAsReadIfNeeded();
+          }
+        }
+        
+        return atBottom;
+      }
+    }
+    return true;
+  }, [isAtBottom, markMessagesAsReadIfNeeded]);
+  
   // Handle scroll events to detect if user has scrolled up
   const handleScroll = useCallback(() => {
     checkIfAtBottom();
   }, [checkIfAtBottom]);
   
   // Get participants info from the chat
-  const participantsInfo = chatQuery?.participantsInfo || [];
+  const participantsInfo = useMemo(() => chatQuery?.participantsInfo || [], [chatQuery?.participantsInfo]);
   
   // Get current user role info securely from server
   const currentUser = useQuery(api.users.getMe);
@@ -206,7 +211,7 @@ export function MessageList({ chatId }: MessageListProps) {
     
     // Update the previous message count after checking
     prevMessageCountRef.current = messageCount;
-  }, [messages.length, isAtBottom, markMessagesAsReadIfNeeded]);
+  }, [messages.length, isAtBottom, markMessagesAsReadIfNeeded, scrollToBottom]);
   
   // Mark messages as read when component mounts if at bottom
   useEffect(() => {
@@ -230,18 +235,18 @@ export function MessageList({ chatId }: MessageListProps) {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [chatId]);
+  }, [chatId, isAtBottom, scrollToBottom, messages.length]);
 
   // Log chat and message data for debugging
   useEffect(() => {
     if (chatId) {
-      console.log(`[MessageList] Chat ID: ${chatId}`);
-      console.log(`[MessageList] Messages loaded: ${messages.length}`);
-      console.log(`[MessageList] Current user ID: ${user?.id}`);
-      console.log(`[MessageList] Is admin: ${isAdmin}`);
+      // console.log(`[MessageList] Chat ID: ${chatId}`);
+      // console.log(`[MessageList] Messages loaded: ${messages.length}`);
+      // console.log(`[MessageList] Current user ID: ${user?.id}`);
+      // console.log(`[MessageList] Is admin: ${isAdmin}`);
       
       if (messages.length === 0) {
-        console.log("[MessageList] No messages found for this chat");
+        // console.log("[MessageList] No messages found for this chat");
       } else {
         // Log message sender details to debug issues
         messages.slice(0, 3).forEach((msg: Message, i: number) => {
@@ -253,8 +258,8 @@ export function MessageList({ chatId }: MessageListProps) {
           console.log(`  - Timestamp: ${new Date(msg.timestamp).toLocaleString()}`);
           
           // Log participant info for this sender
-          const senderInfo = participantsInfo.find((p: ParticipantInfo) => p.clerkId === msg.sender);
-          console.log(`[MessageList] Sender info:`, senderInfo || 'Not found in participants');
+          // const senderInfo = participantsInfo.find((p: ParticipantInfo) => p.clerkId === msg.sender);
+          // console.log(`[MessageList] Sender info:`, senderInfo || 'Not found in participants');
         });
       }
     }
@@ -270,14 +275,15 @@ export function MessageList({ chatId }: MessageListProps) {
     if (isLoading && containerRef.current) {
       // Don't lock scrolling as it prevents manual scrolling
       // Just store the current scroll position to restore it if needed
-      const scrollableElement = containerRef.current.querySelector('.overflow-y-auto');
+      const currentContainer = containerRef.current;
+      const scrollableElement = currentContainer.querySelector('.overflow-y-auto');
       const currentScroll = scrollableElement ? (scrollableElement as HTMLElement).scrollTop : 0;
       
       return () => {
         // After loading completes, try to maintain the scroll position
         setTimeout(() => {
-          if (containerRef.current) {
-            const scrollableElement = containerRef.current.querySelector('.overflow-y-auto');
+          if (currentContainer) {
+            const scrollableElement = currentContainer.querySelector('.overflow-y-auto');
             if (scrollableElement && !isAtBottom) {
               (scrollableElement as HTMLElement).scrollTop = currentScroll;
             }
@@ -362,21 +368,26 @@ export function MessageList({ chatId }: MessageListProps) {
   }
 
   return (
-    <div className="flex-1 overflow-hidden relative h-full" ref={containerRef}>
-      <div className="h-full overflow-y-auto p-4" 
-           onScroll={handleScroll} 
-           style={{
-             WebkitOverflowScrolling: 'touch', // Improve scroll performance on iOS
-             msOverflowStyle: 'none', // Hide scrollbar on IE/Edge
-             scrollbarWidth: 'thin', // Thin scrollbar on Firefox
-           }}>
-        <div className="flex flex-col gap-6 pb-24">
-          <div className="bg-primary/5 border border-primary/10 rounded-lg px-4 py-2 mb-2 text-center">
-            <p className="text-xs text-muted-foreground">Messages in this chat are private to participants only</p>
-          </div>
-          
+    <div 
+      ref={containerRef}
+      className="relative h-full flex flex-col overflow-hidden"
+      onScroll={handleScroll}
+    >
+      <div className="overflow-y-auto flex-1 h-full pt-2 sm:pt-4 px-2 sm:px-4 md:px-6">
+        <div className="max-w-3xl mx-auto">
           <AnimatePresence initial={false}>
-            {messages.map((message: Message, index) => {
+            {isLoading && !messages.length && (
+              <motion.div
+                className="flex h-full w-full items-center justify-center p-8"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <PinWheel size={40} />
+              </motion.div>
+            )}
+            
+            {messages.map((message, index) => {
               // Determine if this is the current user's message
               // Clerk's user ID might have a different prefix than the message sender ID
               // Try to match the ID part after the last underscore if the full ID doesn't match
@@ -392,10 +403,7 @@ export function MessageList({ chatId }: MessageListProps) {
               
               // Check if message is read by the current user
               const isRead = message.read?.includes(user?.id || "");
-              
-              // For admin view, we want to treat system messages as if they were sent by the admin
-              // so they appear on the right side but with a different color
-              const isSupportMessageForAdmin = isSystemMessage && isAdmin;
+
               
               // Get timestamp from the message
               const messageDate = new Date(message.timestamp);
@@ -492,7 +500,7 @@ export function MessageList({ chatId }: MessageListProps) {
                     <motion.div 
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-center my-4"
+                      className="flex justify-center my-3 sm:my-4"
                     >
                       <Badge variant="outline" className="text-xs font-normal bg-background/60 backdrop-blur-sm">
                         {format(messageDate, "EEEE, MMMM d, yyyy")}
@@ -508,11 +516,11 @@ export function MessageList({ chatId }: MessageListProps) {
                     transition={{ duration: 0.2 }}
                     className={`flex ${
                       showOnRightSide ? "justify-end" : "justify-start"
-                    } items-start gap-3 mb-4 group`}
+                    } items-start gap-2 sm:gap-3 mb-3 sm:mb-4 group`}
                   >
                     {!showOnRightSide && (
                       <div className="flex-shrink-0 mt-1">
-                        <Avatar className="h-8 w-8 border shadow-sm">
+                        <Avatar className="h-7 w-7 sm:h-8 sm:w-8 border shadow-sm">
                           {senderImage ? (
                             // Show sender's avatar if available
                             <AvatarImage src={senderImage} alt={senderName || "User"} />
@@ -536,7 +544,7 @@ export function MessageList({ chatId }: MessageListProps) {
                       </div>
                     )}
                     
-                    <div className={`flex flex-col max-w-[85%] ${showOnRightSide ? "items-end" : "items-start"}`}>
+                    <div className={`flex flex-col max-w-[75%] sm:max-w-[85%] ${showOnRightSide ? "items-end" : "items-start"}`}>
                       {!showOnRightSide && (
                         <span className="text-xs text-muted-foreground mb-1 flex items-center gap-1 px-1">
                           {isSystemMessage ? (
@@ -565,7 +573,7 @@ export function MessageList({ chatId }: MessageListProps) {
                           <TooltipTrigger asChild>
                             <div
                               className={cn(
-                                "rounded-2xl px-4 py-2.5 shadow-sm group-hover:shadow-md transition-shadow",
+                                "rounded-2xl px-3 sm:px-4 py-2 sm:py-2.5 shadow-sm group-hover:shadow-md transition-shadow text-sm sm:text-base",
                                 isAdminMessage 
                                   ? "bg-[#0084ff]/95 text-white" // Admin messages are always blue
                                   : showOnRightSide
@@ -613,7 +621,7 @@ export function MessageList({ chatId }: MessageListProps) {
                     
                     {showOnRightSide && (
                       <div className="flex-shrink-0 mt-1">
-                        <Avatar className="h-8 w-8 border shadow-sm">
+                        <Avatar className="h-7 w-7 sm:h-8 sm:w-8 border shadow-sm">
                           {isUserMessage && user?.imageUrl ? (
                             // Current user's avatar for messages sent by them
                             <AvatarImage src={user.imageUrl} alt={user.fullName || "You"} />
@@ -648,6 +656,9 @@ export function MessageList({ chatId }: MessageListProps) {
           </AnimatePresence>
           <div ref={scrollRef} />
           
+          {/* Add spacer for mobile input */}
+          <div className="h-28 md:h-32" aria-hidden="true"></div>
+          
           {/* Typing indicator */}
           <AnimatePresence>
             {typingStatus && 
@@ -655,8 +666,8 @@ export function MessageList({ chatId }: MessageListProps) {
              typingStatus.typingUsers && 
              typingStatus.typingUsers.length > 0 && (
               <TypingIndicator 
-                users={typingStatus.typingUsers.filter(Boolean) as any} 
-                className="absolute bottom-20 left-4" 
+                users={typingStatus.typingUsers.filter(Boolean) as unknown as TypingUser[]} 
+                className="absolute bottom-32 md:bottom-28 left-4" 
               />
             )}
           </AnimatePresence>
@@ -666,7 +677,7 @@ export function MessageList({ chatId }: MessageListProps) {
       {/* New Messages Indicator with scroll to bottom button */}
       <AnimatePresence>
         {hasNewUnreadMessages && !isAtBottom && (
-          <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2">
+          <div className="absolute bottom-36 md:bottom-32 left-1/2 transform -translate-x-1/2">
             <NewMessageIndicator
               onClick={() => scrollToBottom({ behavior: "smooth" })}
               variant="button"
