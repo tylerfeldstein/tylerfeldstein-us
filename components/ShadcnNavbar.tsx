@@ -23,6 +23,7 @@ import { LogOut, User, MessageSquare, Menu, ChevronDown } from "lucide-react";
 import { ModeToggle } from "@/components/ModeToggle";
 import { useState, useEffect } from "react";
 import Image from 'next/image';
+import { useTheme } from "next-themes";
 
 interface NavItem {
   title: string;
@@ -101,19 +102,25 @@ const mainNavItems: NavItem[] = [
 export default function ShadcnNavbar() {
   const { isSignedIn, user } = useUser();
   const clerk = useClerk();
+  const [mounted, setMounted] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const { theme, setTheme } = useTheme();
   
-  const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("home");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const headerHeight = 20;
   
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     const handleScroll = () => {
       const offset = window.scrollY;
       if (offset > 50) {
-        setScrolled(true);
+        setIsScrolled(true);
       } else {
-        setScrolled(false);
+        setIsScrolled(false);
       }
       
       // Update active section based on scroll position
@@ -166,7 +173,7 @@ export default function ShadcnNavbar() {
       <div
         className={cn(
           "transition-all duration-300 ease-in-out pointer-events-auto w-full",
-          scrolled
+          isScrolled
             ? "bg-background/80 backdrop-blur-sm shadow-md mt-4 rounded-full border border-border max-w-[85%] sm:max-w-[480px] md:max-w-[580px] lg:max-w-[680px]"
             : "w-full bg-background/90 backdrop-blur-sm border-b border-border"
         )}
@@ -316,62 +323,66 @@ export default function ShadcnNavbar() {
             </div>
             
             {/* User Menu */}
-            {isSignedIn && user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden outline-none ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-                    {user.imageUrl ? (
-                      <Image 
-                        src={user.imageUrl} 
-                        alt={user.firstName || "User"} 
-                        width={32}
-                        height={32}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="bg-primary h-full w-full flex items-center justify-center">
-                        <User className="h-4 w-4 text-primary-foreground" />
-                      </div>
-                    )}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-background text-foreground shadow-md rounded-md">
-                  <DropdownMenuLabel className="font-medium">My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {/* Show theme toggle in dropdown for mobile */}
-                  <DropdownMenuItem className="sm:hidden focus:bg-accent focus:text-accent-foreground">
-                    <div className="flex items-center w-full">
-                      <ModeToggle />
-                      <span className="ml-2">Theme</span>
-                    </div>
-                  </DropdownMenuItem>
-                  {/* Show Messages in dropdown for mobile */}
-                  <DropdownMenuItem asChild className="md:hidden focus:bg-accent focus:text-accent-foreground">
-                    <Link href="/messages" className="flex items-center">
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      <span>Messages</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Logout</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center justify-center h-7 w-7 rounded-full bg-muted outline-none">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-background text-foreground shadow-md rounded-md">
-                  <DropdownMenuItem onClick={handleLogin} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
-                    <LogOut className="mr-2 h-4 w-4 rotate-180" />
-                    <span>Sign In</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {mounted && (
+              <>
+                {isSignedIn && user ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden outline-none ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                        {user.imageUrl ? (
+                          <Image 
+                            src={user.imageUrl} 
+                            alt={user.firstName || "User"} 
+                            width={32}
+                            height={32}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="bg-primary h-full w-full flex items-center justify-center">
+                            <User className="h-4 w-4 text-primary-foreground" />
+                          </div>
+                        )}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 bg-background text-foreground shadow-md rounded-md">
+                      <DropdownMenuLabel className="font-medium">My Account</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {/* Show theme toggle in dropdown for mobile */}
+                      <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="sm:hidden focus:bg-accent focus:text-accent-foreground">
+                        <div className="flex items-center w-full">
+                          <ModeToggle inline />
+                          <span className="ml-2">Theme</span>
+                        </div>
+                      </DropdownMenuItem>
+                      {/* Show Messages in dropdown for mobile */}
+                      <DropdownMenuItem asChild className="md:hidden focus:bg-accent focus:text-accent-foreground">
+                        <Link href="/messages" className="flex items-center">
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          <span>Messages</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleLogout} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Logout</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex items-center justify-center h-7 w-7 rounded-full bg-muted outline-none">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 bg-background text-foreground shadow-md rounded-md">
+                      <DropdownMenuItem onClick={handleLogin} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
+                        <LogOut className="mr-2 h-4 w-4 rotate-180" />
+                        <span>Sign In</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </>
             )}
           </div>
         </div>

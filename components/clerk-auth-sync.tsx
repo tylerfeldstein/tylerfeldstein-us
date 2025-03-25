@@ -42,37 +42,43 @@ export function ClerkAuthSync() {
   
   // Memoize the sync function to avoid recreating it on each render
   const syncUserData = useCallback(async (force = false) => {
-    // Skip if already syncing
-    if (isSyncingRef.current) {
-      console.log("Already syncing user, skipping");
+    // Skip if already syncing, unless force is true
+    if (isSyncingRef.current && !force) {
+      // console.log("Already syncing user, skipping");
       return;
     }
     
     // Only try to sync when both Clerk and Convex are authenticated
     if (isClerkLoaded && isSignedIn && user && isConvexAuthenticated && !isConvexLoading) {
+      // If not forced, check if we've already synced this user in this session
+      if (!force && localStorage.getItem(SYNC_STATUS_KEY) === user.id) {
+        // console.log("User already synced in this session, skipping");
+        return;
+      }
+      
       try {
         // Mark as syncing to prevent concurrent calls
         isSyncingRef.current = true;
         lastSyncTimeRef.current = Date.now();
         
-        console.log("ClerkAuthSync: Syncing user to Convex...", {
-          userId: user.id,
-          email: user.emailAddresses[0]?.emailAddress,
-          retryCount,
-          hasInitialSync: hasInitialSyncRef.current,
-          convexAuthenticated: isConvexAuthenticated,
-          force
-        });
+        // console.log("ClerkAuthSync: Syncing user to Convex...", {
+        //   userId: user.id,
+        //   email: user.emailAddresses[0]?.emailAddress,
+        //   retryCount,
+        //   hasInitialSync: hasInitialSyncRef.current,
+        //   convexAuthenticated: isConvexAuthenticated,
+        //   force
+        // });
         
         // Mark that we've attempted a sync for this session
         syncAttemptedRef.current = true;
         
         // First try the regular sync
-        console.log("Attempting regular sync first...");
+        // console.log("Attempting regular sync first...");
         const result = await syncUser();
         
         if (result.success) {
-          console.log("ClerkAuthSync: User synced successfully with ID:", result.userId);
+          // console.log("ClerkAuthSync: User synced successfully with ID:", result.userId);
           // Reset retry count on success
           setRetryCount(0);
           hasInitialSyncRef.current = true;
@@ -86,11 +92,11 @@ export function ClerkAuthSync() {
           console.error("ClerkAuthSync: Regular sync failed, trying force create:", result.error, result.details);
           
           // If regular sync fails, try force create
-          console.log("Attempting force create as fallback...");
+          // console.log("Attempting force create as fallback...");
           const forceResult = await forceCreateUser();
           
           if (forceResult.success) {
-            console.log("ClerkAuthSync: Force create succeeded with ID:", forceResult.userId);
+            // console.log("ClerkAuthSync: Force create succeeded with ID:", forceResult.userId);
             toast.success("User created successfully");
             hasInitialSyncRef.current = true;
             setRetryCount(0);
@@ -132,10 +138,10 @@ export function ClerkAuthSync() {
       localStorage.removeItem(SYNC_STATUS_KEY);
     } else if (isClerkLoaded && isSignedIn && user && (!isConvexAuthenticated || isConvexLoading)) {
       // Debug log for when user is signed in but Convex isn't ready
-      console.log("ClerkAuthSync: Waiting for Convex to be authenticated", {
-        isConvexAuthenticated,
-        isConvexLoading
-      });
+      // console.log("ClerkAuthSync: Waiting for Convex to be authenticated", {
+      //   isConvexAuthenticated,
+      //   isConvexLoading
+      // });
     }
   }, [isClerkLoaded, isSignedIn, user, isConvexAuthenticated, isConvexLoading, retryCount]);
   
@@ -143,7 +149,7 @@ export function ClerkAuthSync() {
   useEffect(() => {
     // Run whenever authentication state is ready
     if (isClerkLoaded && isSignedIn && user && isConvexAuthenticated && !isConvexLoading) {
-      console.log("ClerkAuthSync: All systems ready, forcing initial sync for user", user.id);
+      // console.log("ClerkAuthSync: All systems ready, forcing initial sync for user", user.id);
       
       // Always force a sync when the component mounts with an authenticated user
       syncUserData(true);
@@ -157,7 +163,7 @@ export function ClerkAuthSync() {
     
     // If this is a sign-in event, we should sync the user
     if (isSignInEvent && user) {
-      console.log("ClerkAuthSync: Detected sign-in event, will sync user");
+      // console.log("ClerkAuthSync: Detected sign-in event, will sync user");
       syncUserData(true); // Force sync on sign-in
     }
     

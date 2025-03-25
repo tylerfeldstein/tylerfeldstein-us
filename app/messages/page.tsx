@@ -24,6 +24,7 @@ export default function MessagesPage() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [showError, setShowError] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState(0);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   
   // Handle token generation when user is authenticated but has no token
   useEffect(() => {
@@ -43,7 +44,11 @@ export default function MessagesPage() {
           setTokenError("An error occurred while generating secure chat token.");
         } finally {
           setIsGeneratingToken(false);
+          setInitialLoadComplete(true);
         }
+      } else if (isLoaded && isSignedIn && currentUser) {
+        // If we don't need to generate a token, mark initial load as complete
+        setInitialLoadComplete(true);
       }
     };
     
@@ -133,8 +138,8 @@ export default function MessagesPage() {
     );
   }
   
-  // Show loading for token generation only since initial loading is handled by layout
-  if (isGeneratingToken || (tokenError || refreshError) && !showError) {
+  // Show loading for token generation or initial load
+  if (!initialLoadComplete || isGeneratingToken || ((tokenError || refreshError) && !showError)) {
     return (
       <div className="h-full w-full flex items-center justify-center p-4">
         <LoadingScreen 
@@ -169,7 +174,7 @@ export default function MessagesPage() {
     );
   }
   
-  // If we don't have a token and we're not generating one, show a retry button with LoadingScreen
+  // Only show the retry button if we've completed initial load and still don't have a token
   return (
     <div className="h-full w-full flex items-center justify-center p-4">
       <LoadingScreen 
@@ -183,7 +188,10 @@ export default function MessagesPage() {
         fullScreen={false}
         customButton={
           <Button 
-            onClick={() => generateChatTokens()}
+            onClick={() => {
+              setInitialLoadComplete(false);
+              generateChatTokens();
+            }}
             className="gap-2"
           >
             <RefreshCw className="h-4 w-4" />

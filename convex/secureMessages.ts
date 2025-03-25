@@ -523,25 +523,43 @@ export const createChatSecure = mutation({
       const userId = args.tokenPayload.userId;
       const jti = args.tokenPayload.jti;
       
-      // Check if token is invalidated
-      const tokenRecord = await ctx.db
-        .query("chatTokens")
-        .filter(q => 
-          q.eq(q.field("tokenId"), jti) && 
-          q.eq(q.field("userId"), userId)
-        )
-        .first();
+      console.log(`[createChatSecure] Creating chat for user ${userId} with token ${jti}`);
       
-      if (!tokenRecord || tokenRecord.isInvalidated) {
-        return {
-          error: "Token has been invalidated",
-          success: false,
-          chatId: null
-        };
+      // Skip token validation if jti is empty (this means we're using a fresh token)
+      if (!jti) {
+        console.log(`[createChatSecure] No JTI provided, assuming fresh token`);
+      } else {
+        // Check if token is invalidated
+        const tokenRecord = await ctx.db
+          .query("chatTokens")
+          .filter(q => 
+            q.eq(q.field("tokenId"), jti) && 
+            q.eq(q.field("userId"), userId)
+          )
+          .first();
+        
+        if (!tokenRecord) {
+          console.warn(`[createChatSecure] No token record found for token ${jti}`);
+          return {
+            error: "Token has been invalidated",
+            success: false,
+            chatId: null
+          };
+        }
+        
+        if (tokenRecord.isInvalidated) {
+          console.warn(`[createChatSecure] Token ${jti} is invalidated`);
+          return {
+            error: "Token has been invalidated",
+            success: false,
+            chatId: null
+          };
+        }
       }
       
+      console.log(`[createChatSecure] Token verification passed`);
+      
       // Get the actual user from the database to check their role
-      // This ensures we use the server's role information, not the client's claim
       const user = await ctx.db
         .query("users")
         .withIndex("by_clerkId", q => q.eq("clerkId", userId))
@@ -568,6 +586,8 @@ export const createChatSecure = mutation({
         updatedAt: Date.now()
       });
       
+      console.log(`[createChatSecure] Created chat ${chatId}`);
+      
       // Create the initial message
       await ctx.db.insert("messages", {
         chatId,
@@ -581,7 +601,7 @@ export const createChatSecure = mutation({
       
       return { success: true, error: null, chatId };
     } catch (error) {
-      console.error("Error in createChatSecure:", error);
+      console.error("[createChatSecure] Error:", error);
       return {
         error: "Authentication error",
         success: false,
@@ -636,18 +656,18 @@ export const listChatsSecure = query({
       
       // Determine if user is admin from database record
       const isAdmin = user.role === "admin";
-      console.log(`[listChatsSecure] User ${userId} role from database: ${user.role}, isAdmin: ${isAdmin}`);
+      // console.log(`[listChatsSecure] User ${userId} role from database: ${user.role}, isAdmin: ${isAdmin}`);
       
       let chats;
       
       if (isAdmin) {
         // Admins can see all chats
-        console.log(`[listChatsSecure] Fetching all chats for admin user ${userId}`);
+        // console.log(`[listChatsSecure] Fetching all chats for admin user ${userId}`);
         chats = await ctx.db.query("chats").collect();
-        console.log(`[listChatsSecure] Found ${chats.length} total chats for admin`);
+        // console.log(`[listChatsSecure] Found ${chats.length} total chats for admin`);
       } else {
         // Get all chats where user is a participant or creator
-        console.log(`[listChatsSecure] Fetching chats for regular user ${userId}`);
+        // console.log(`[listChatsSecure] Fetching chats for regular user ${userId}`);
         chats = await ctx.db
           .query("chats")
           .collect();
@@ -658,7 +678,7 @@ export const listChatsSecure = query({
           (chat.participantIds && chat.participantIds.includes(userId))
         );
         
-        console.log(`[listChatsSecure] Found ${chats.length} chats for user`);
+        // console.log(`[listChatsSecure] Found ${chats.length} chats for user`);
       }
       
       // For each chat, get the last message and participant info

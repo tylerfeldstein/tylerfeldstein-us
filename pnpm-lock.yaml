@@ -158,6 +158,9 @@ importers:
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      notifications:
+        specifier: link:@/lib/notifications
+        version: link:@/lib/notifications
       openai:
         specifier: ^4.89.0
         version: 4.89.0(zod@3.24.2)

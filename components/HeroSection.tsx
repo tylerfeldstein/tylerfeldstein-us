@@ -85,6 +85,7 @@ const HeroSection = () => {
                         src="/photos/DSC00379-min.JPG"
                         alt="Tyler Feldstein - AI Engineer and Cybersecurity Architect"
                         fill
+                        sizes="(max-width: 768px) 192px, (max-width: 1024px) 160px, 100vw"
                         className="object-cover"
                         priority
                       />
@@ -194,6 +195,7 @@ const HeroSection = () => {
                       src="/photos/DSC00379-min.JPG"
                       alt="Tyler Feldstein - AI Engineer and Cybersecurity Architect"
                       fill
+                      sizes="(max-width: 768px) 192px, (max-width: 1024px) 160px, 100vw"
                       className="object-cover"
                       priority
                     />

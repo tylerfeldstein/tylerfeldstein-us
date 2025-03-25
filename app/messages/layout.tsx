@@ -8,7 +8,6 @@ import MessagesNavbar from "@/components/MessagesNavbar";
 import { motion, AnimatePresence } from "framer-motion";
 import { LoadingScreen } from "@/components/loaders/LoadingScreen";
 import "./mobile-safe-area.css";
-import Head from "next/head";
 
 export default function MessagesLayout({
   children,

@@ -35,35 +35,72 @@
   bottom: env(safe-area-inset-bottom);
 }
 
-/* When viewport adjusts after user interaction (keyboard appears) */
-@media (max-height: 600px) {
-  .h-keyboard-adjust {
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-}
-
 /* Prevents horizontal overflow on narrow screens */
 .max-w-screen-safe {
   max-width: calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right));
 }
 
-/* Prevent text size adjustments and content resizing when keyboard appears */
+/* Prevent text size adjustments */
 html {
   -webkit-text-size-adjust: none;
   text-size-adjust: none;
 }
 
-/* Prevent content from being scaled or zoomed when the keyboard appears */
+/* Prevent content from being scaled or zoomed */
 input, 
 textarea {
-  font-size: 16px !important; /* Minimum font size to prevent zoom on iOS */
+  font-size: 16px !important;
 }
 
-/* Fix for iOS rendering when keyboard appears */
-body.keyboard-visible {
-  height: 100% !important;
-  overflow: hidden !important;
-  position: fixed !important;
-  width: 100% !important;
+/* Mobile keyboard adjustments */
+.keyboard-visible {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Keep headers fixed at top */
+.keyboard-visible .sticky {
+  position: sticky !important;
+  top: 0;
+  z-index: 40;
+}
+
+/* Message list container adjustments */
+.message-list-container {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  position: absolute;
+  inset: 0;
+  padding: 1rem;
+  padding-bottom: calc(1rem + var(--input-height, 80px) + 2rem);
+}
+
+.keyboard-visible .message-list-container {
+  padding-bottom: calc(1rem + var(--input-height, 80px) + 2rem);
+}
+
+/* Hide unnecessary elements when keyboard is visible */
+.keyboard-visible .hide-on-keyboard {
+  display: none;
+}
+
+/* iOS specific keyboard fixes */
+@supports (-webkit-touch-callout: none) {
+  .keyboard-visible .message-input-container {
+    bottom: 0;
+    padding-bottom: 0;
+  }
+  
+  .keyboard-visible .message-list-container {
+    height: calc(100vh - var(--keyboard-height, 0px) - var(--header-height, 0px) - var(--input-height, 0px)) !important;
+  }
+}
+
+/* Android specific keyboard fixes */
+@supports not (-webkit-touch-callout: none) {
+  .keyboard-visible .message-list-container {
+    height: calc(100vh - var(--keyboard-height, 0px) - var(--header-height, 0px) - var(--input-height, 0px)) !important;
+  }
 } 

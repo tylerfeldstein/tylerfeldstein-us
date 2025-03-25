@@ -118,73 +118,91 @@ const LogoScroll = () => {
     {
       name: "Everbridge",
       logo: (
-        <Image 
-          src="/companies/everbridge.png" 
-          alt="Everbridge - Company where Tyler Feldstein applied AI security expertise" 
-          width={180} 
-          height={72} 
-          className="object-contain h-18" 
-        />
+        <div className="relative w-[180px] h-[72px]">
+          <Image 
+            src="/companies/everbridge.png" 
+            alt="Everbridge - Company where Tyler Feldstein applied AI security expertise" 
+            fill
+            sizes="180px"
+            className="object-contain"
+            priority
+          />
+        </div>
       )
     },
     {
       name: "Warner Bros. Discovery",
       logo: (
-        <Image 
-          src="/companies/Warner_Bros._Discovery.png" 
-          alt="Warner Bros. Discovery - Where Tyler Feldstein worked as a Cybersecurity Architect" 
-          width={180} 
-          height={72} 
-          className="object-contain h-18"
-        />
+        <div className="relative w-[180px] h-[72px]">
+          <Image 
+            src="/companies/Warner_Bros._Discovery.png" 
+            alt="Warner Bros. Discovery - Where Tyler Feldstein worked as a Cybersecurity Architect" 
+            fill
+            sizes="180px"
+            className="object-contain"
+            priority
+          />
+        </div>
       )
     },
     {
       name: "CACI",
       logo: (
-        <Image 
-          src="/companies/caci.svg" 
-          alt="CACI - Where Tyler Feldstein implemented AI security solutions" 
-          width={180} 
-          height={72} 
-          className="object-contain h-18" 
-        />
+        <div className="relative w-[180px] h-[72px]">
+          <Image 
+            src="/companies/caci.svg" 
+            alt="CACI - Where Tyler Feldstein implemented AI security solutions" 
+            fill
+            sizes="180px"
+            className="object-contain"
+            priority
+          />
+        </div>
       )
     },
     {
       name: "T-Mobile",
       logo: (
-        <Image 
-          src="/companies/tmobile.svg" 
-          alt="T-Mobile - Where Tyler Feldstein developed cloud security architecture" 
-          width={180} 
-          height={72} 
-          className="object-contain h-18"
-        />
+        <div className="relative w-[180px] h-[72px]">
+          <Image 
+            src="/companies/tmobile.svg" 
+            alt="T-Mobile - Where Tyler Feldstein developed cloud security architecture" 
+            fill
+            sizes="180px"
+            className="object-contain"
+            priority
+          />
+        </div>
       )
     },
     {
       name: "US Army",
       logo: (
-        <Image 
-          src="/companies/army.png" 
-          alt="US Army" 
-          width={180} 
-          height={72} 
-          className="object-contain h-18"
-        />
+        <div className="relative w-[180px] h-[72px]">
+          <Image 
+            src="/companies/army.png" 
+            alt="US Army" 
+            fill
+            sizes="180px"
+            className="object-contain"
+            priority
+          />
+        </div>
       )
     },
     {
       name: "Department of Defense",
       logo: (
-        <Image 
-          src="/companies/dod.png" 
-          alt="Department of Defense" 
-          width={180} 
-          height={72} 
-          className="object-contain h-18"
-        />
+        <div className="relative w-[180px] h-[72px]">
+          <Image 
+            src="/companies/dod.png" 
+            alt="Department of Defense" 
+            fill
+            sizes="180px"
+            className="object-contain"
+            priority
+          />
+        </div>
       )
     }
   ];

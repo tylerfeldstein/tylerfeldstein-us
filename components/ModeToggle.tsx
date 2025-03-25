@@ -6,7 +6,7 @@ import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
 
-export function ModeToggle() {
+export function ModeToggle({ inline }: { inline?: boolean }) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
@@ -19,8 +19,19 @@ export function ModeToggle() {
     setTheme(theme === "dark" ? "light" : "dark")
   }
 
+  const content = (
+    <>
+      {theme === "dark" ? (
+        <Sun className="h-[1.2rem] w-[1.2rem]" />
+      ) : (
+        <Moon className="h-[1.2rem] w-[1.2rem]" />
+      )}
+      <span className="sr-only">Toggle theme</span>
+    </>
+  )
+
   if (!mounted) {
-    return (
+    return inline ? null : (
       <Button 
         variant="ghost" 
         size="icon" 
@@ -32,6 +43,14 @@ export function ModeToggle() {
     )
   }
 
+  if (inline) {
+    return (
+      <div onClick={toggleTheme} className="cursor-pointer">
+        {content}
+      </div>
+    )
+  }
+
   return (
     <Button 
       onClick={toggleTheme} 
@@ -39,12 +58,7 @@ export function ModeToggle() {
       size="icon" 
       className="p-0 h-8 w-8 rounded-full hover:bg-muted transition-colors hover:text-foreground"
     >
-      {theme === "dark" ? (
-        <Sun className="h-[1.2rem] w-[1.2rem]" />
-      ) : (
-        <Moon className="h-[1.2rem] w-[1.2rem]" />
-      )}
-      <span className="sr-only">Toggle theme</span>
+      {content}
     </Button>
   )
 } 

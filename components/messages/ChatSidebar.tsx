@@ -1,44 +1,26 @@
 "use client";
 
 import * as React from "react";
-import { useClerk, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { useTheme } from "next-themes";
 import { format, isToday, isYesterday } from "date-fns";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { isUserAdmin } from "@/actions/auth";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 import {
-  UserIcon,
-  LogOutIcon,
-  SettingsIcon,
-  ChevronDownIcon,
   MessageSquarePlus,
-  PenIcon,
-  TrashIcon,
+  Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -48,21 +30,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import UnreadBadge from "./UnreadBadge";
-import { toast } from "sonner";
-
-// Define participant info interface to handle optional nulls
-interface ParticipantInfo {
-  clerkId: string;
-  name?: string;
-  email?: string;
-  imageUrl?: string;
-  role?: string;
-}
-
-// Type for participants that can be null from the API
-type ParticipantInfoWithNull = ParticipantInfo | null;
 
 // Helper function to format timestamp like iPhone messages
 function formatTimestamp(timestamp: number): string {
@@ -85,8 +52,8 @@ interface ChatSidebarProps {
   selectedChatId: Id<"chats"> | null;
   setSelectedChatId: (chatId: Id<"chats">) => void;
   onNewChat: () => void;
-  sidebarWidth: number;
   isExpanded: boolean;
+  setIsExpanded: (expanded: boolean) => void;
 }
 
 export function ChatSidebar({
@@ -95,10 +62,14 @@ export function ChatSidebar({
   setSelectedChatId,
   onNewChat,
   isExpanded,
+  setIsExpanded
 }: ChatSidebarProps) {
   const { user } = useUser();
-  const clerk = useClerk();
-  const { resolvedTheme } = useTheme();
+
+  const chatsQuery = useQuery(api.messages.listChats);
+  const chats = useMemo(() => chatsQuery || [], [chatsQuery]);
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  const unreadMessages = useQuery(api.messages.getUnreadMessageCounts) || {};
 
   // Check admin status from server action
   const [isAdmin, setIsAdmin] = useState(false);
@@ -119,26 +90,6 @@ export function ChatSidebar({
 
     checkAdminStatus();
   }, [user]);
-
-  // Use secure chat listing to ensure admin access
-  const chats =
-    useQuery(
-      api.secureMessages.listChatsSecure,
-      user
-        ? {
-            tokenPayload: {
-              userId: user.id,
-              userRole: "user", // Server will check the actual role from the database
-              exp: 0, // These will be filled by server
-              iat: 0,
-              jti: "", // This will be filled by server
-            },
-          }
-        : "skip"
-    ) || [];
-
-  // Get unread messages across all chats
-  const unreadMessages = useQuery(api.messages.getUnreadMessageCounts) || {};
 
   // Mutations for context menu actions
   const deleteChat = useMutation(api.messages.deleteChat);
@@ -202,411 +153,157 @@ export function ChatSidebar({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-3 sm:p-4">
-        <h2
-          className={cn(
-            "text-xl font-semibold",
-            !isExpanded && "sr-only" // Hide title when collapsed
-          )}
-        >
-          Conversations
-        </h2>
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className={cn(
+        "flex items-center justify-between p-4 border-b border-border/50",
+        (!isExpanded || isMobile) && "flex-col items-center gap-2"
+      )}>
+        {isExpanded && !isMobile ? (
+          <>
+            <h2 className="text-lg font-semibold">Messages</h2>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={onNewChat}>
+                <MessageSquarePlus className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setIsExpanded(false)}>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Button variant="ghost" size="icon" onClick={onNewChat}>
+              <MessageSquarePlus className="h-5 w-5" />
+            </Button>
+            {!isMobile && (
+              <Button variant="ghost" size="icon" onClick={() => setIsExpanded(true)}>
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            )}
+          </>
+        )}
       </div>
 
-      <ScrollArea className="flex-1">
-        <div
-          className={cn(
-            "flex",
-            isExpanded
-              ? "flex-col space-y-1 sm:space-y-2 px-2"
-              : "flex-col items-center px-1 space-y-3"
-          )}
-        >
-          {chats.map((chat) => {
-            const unreadCount = unreadMessages[chat._id] || 0;
+      {/* Chat list */}
+      <div className="flex-1 overflow-y-auto py-2">
+        {chats.map((chat) => {
+          const unreadCount = unreadMessages[chat._id] || 0;
+          const lastMessage = chat.lastMessageContent || "No messages yet";
+          const lastMessageTime = chat.lastMessageTimestamp ? 
+            formatTimestamp(chat.lastMessageTimestamp) : "";
 
-            return (
-              <ContextMenu key={chat._id}>
-                <ContextMenuTrigger asChild>
+          return (
+            <div
+              key={chat._id}
+              className={cn(
+                "group w-full flex items-center gap-3 py-2 transition-colors cursor-pointer",
+                (!isExpanded || isMobile) ? "px-2 justify-center" : "px-4",
+                selectedChatId === chat._id && "bg-accent"
+              )}
+              onClick={() => {
+                setSelectedChatId(chat._id);
+                if (isMobile) setIsSidebarOpen(false);
+              }}
+            >
+              <div className={cn(
+                "relative flex items-center justify-center",
+                "h-10 w-10 rounded-full bg-primary text-primary-foreground"
+              )}>
+                <span className="text-sm font-medium">
+                  {chat.name?.[0]?.toUpperCase() || "C"}
+                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              {isExpanded && !isMobile && (
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium truncate">{chat.name}</p>
+                    {lastMessageTime && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {lastMessageTime}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {lastMessage}
+                  </p>
+                </div>
+              )}
+              {isAdmin && isExpanded && !isMobile && (
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button
-                    variant={
-                      selectedChatId === chat._id ? "secondary" : "ghost"
-                    }
-                    className={cn(
-                      "w-full justify-start relative group",
-                      selectedChatId === chat._id && resolvedTheme === "light"
-                        ? "bg-blue-50 hover:bg-blue-100 text-blue-800"
-                        : "",
-                      isExpanded
-                        ? "px-2 py-3 sm:py-6"
-                        : "flex-col p-0 h-12 w-12 justify-center items-center m-auto collapsed-avatar"
-                    )}
-                    onClick={() => {
-                      setSelectedChatId(chat._id);
-
-                      // On mobile, close sidebar after selecting chat
-                      if (window.innerWidth < 768) {
-                        setIsSidebarOpen(false);
-                      }
-                    }}
-                  >
-                    {/* Display avatar of the other participant or admin */}
-                    <Avatar className={isExpanded ? "mr-2 h-8 w-8" : "h-8 w-8"}>
-                      {(() => {
-                        // Find the other participant (not the current user)
-                        const otherParticipant = chat.participantsInfo?.find(
-                          (p: ParticipantInfoWithNull) =>
-                            p && p.clerkId !== user.id
-                        );
-
-                        // Find admin participant as fallback
-                        const adminParticipant = chat.participantsInfo?.find(
-                          (p: ParticipantInfoWithNull) =>
-                            p && p.role === "admin"
-                        );
-
-                        // Determine which avatar and fallback to use
-                        let avatarUrl = "";
-                        let fallbackInitial = "C";
-
-                        if (otherParticipant) {
-                          avatarUrl = otherParticipant.imageUrl || "";
-                          fallbackInitial = (
-                            otherParticipant.name?.[0] ||
-                            otherParticipant.email?.[0] ||
-                            "C"
-                          ).toUpperCase();
-                        } else if (adminParticipant) {
-                          avatarUrl = adminParticipant.imageUrl || "";
-                          fallbackInitial = (
-                            adminParticipant.name?.[0] ||
-                            adminParticipant.email?.[0] ||
-                            "S"
-                          ).toUpperCase();
-                        }
-
-                        return (
-                          <>
-                            <AvatarImage src={avatarUrl} />
-                            <AvatarFallback className="bg-primary text-primary-foreground">
-                              {fallbackInitial}
-                            </AvatarFallback>
-                          </>
-                        );
-                      })()}
-                    </Avatar>
-
-                    {isExpanded && (
-                      <div className="flex-1 text-left truncate">
-                        <span className="inline-block max-w-[90%] truncate">
-                          {(() => {
-                            // console.log(
-                            //   `[ChatSidebar] Processing chat ${chat._id}, name: ${chat.name}`
-                            // );
-                            // console.log(
-                            //   `[ChatSidebar] Chat has ${chat.participantsInfo?.length || 0} participants info`
-                            // );
-
-                            // Check if this is a new chat with only a system message
-                            const onlyHasCurrentUser =
-                              chat.participantsInfo?.length === 1 &&
-                              chat.participantsInfo[0]?.clerkId === user.id;
-
-                            const hasSystemMessageOnly =
-                              chat.lastMessageContent ===
-                              "Hello! How can I help you today?";
-
-                            // Always show "New Chat" for chats with only the current user and a system message
-                            if (onlyHasCurrentUser && hasSystemMessageOnly) {
-                              // console.log(
-                              //   `[ChatSidebar] Showing "New Chat" for chat with only system message`
-                              // );
-                              return "New Chat";
-                            }
-
-                            // For admin view, prioritize showing participant name
-                            if (isAdmin) {
-                              // Find other participant (not current user)
-                              const otherParticipant =
-                                chat.participantsInfo?.find(
-                                  (p: ParticipantInfoWithNull) =>
-                                    p && p.clerkId !== user.id
-                                );
-
-                              // If we found another participant, use their info
-                              if (otherParticipant) {
-                                // console.log(
-                                //   `[ChatSidebar] Found other participant for admin view:`,
-                                //   otherParticipant
-                                // );
-                                return (
-                                  otherParticipant.name ||
-                                  otherParticipant.email ||
-                                  "User"
-                                );
-                              }
-                            }
-
-                            // For regular users, show chat name if available
-                            if (chat.name !== "New Chat") {
-                              return chat.name;
-                            }
-
-                            // Otherwise, use other participant's name/email
-                            const otherParticipant =
-                              chat.participantsInfo?.find(
-                                (p: ParticipantInfoWithNull) =>
-                                  p && p.clerkId !== user.id
-                              );
-
-                            if (otherParticipant) {
-                              return (
-                                otherParticipant.name ||
-                                otherParticipant.email ||
-                                "User"
-                              );
-                            }
-
-                            // Fallback to admin name if it exists
-                            const adminParticipant =
-                              chat.participantsInfo?.find(
-                                (p: ParticipantInfoWithNull) =>
-                                  p && p.role === "admin"
-                              );
-
-                            if (adminParticipant) {
-                              // console.log(
-                              //   `[ChatSidebar] Found admin participant:`,
-                              //   adminParticipant
-                              // );
-                              return (
-                                adminParticipant.name ||
-                                adminParticipant.email ||
-                                "Support"
-                              );
-                            }
-
-                            // Default fallback
-                            return "New Chat";
-                          })()}
-                        </span>
-
-                        {/* Display chat name below user name for admins */}
-                        {isAdmin && chat.name && chat.name !== "New Chat" && (
-                          <div className="text-xs text-muted-foreground/70 truncate mt-0.5 mb-1">
-                            <span className="truncate max-w-[100%] italic">
-                              Chat: {chat.name}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Show last message preview */}
-                        {chat.lastMessageContent && (
-                          <div
-                            className={cn(
-                              "text-xs text-muted-foreground truncate mt-0.5 flex justify-between",
-                              "group-hover:text-foreground/90 group-hover:font-medium transition-colors",
-                              selectedChatId === chat._id
-                                ? resolvedTheme === "dark"
-                                  ? "text-foreground/80"
-                                  : "text-foreground/90"
-                                : ""
-                            )}
-                          >
-                            <span className="truncate max-w-[80%]">
-                              {chat.lastMessageContent.length > 30
-                                ? chat.lastMessageContent.substring(0, 27) +
-                                  "..."
-                                : chat.lastMessageContent}
-                            </span>
-                            {chat.lastMessageTimestamp && (
-                              <span
-                                className={cn(
-                                  "text-[10px] tabular-nums",
-                                  "group-hover:text-foreground/80",
-                                  selectedChatId === chat._id
-                                    ? "text-foreground/70"
-                                    : ""
-                                )}
-                              >
-                                {formatTimestamp(chat.lastMessageTimestamp)}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {unreadCount > 0 && (
-                      <UnreadBadge count={unreadCount} expanded={isExpanded} />
-                    )}
-                  </Button>
-                </ContextMenuTrigger>
-
-                <ContextMenuContent className="w-64">
-                  <ContextMenuItem
-                    onClick={() => {
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setChatToRename(chat._id);
                       setNewChatName(chat.name || "");
                       setIsRenameDialogOpen(true);
                     }}
-                    className="cursor-pointer h-10"
                   >
-                    <PenIcon className="mr-2 h-4 w-4" />
-                    <span>Rename Chat</span>
-                  </ContextMenuItem>
-
-                  <ContextMenuSeparator />
-
-                  <ContextMenuItem
-                    onClick={() => {
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setChatToDelete(chat._id);
                       setIsDeleteDialogOpen(true);
                     }}
-                    className="cursor-pointer text-destructive focus:text-destructive h-10"
                   >
-                    <TrashIcon className="mr-2 h-4 w-4" />
-                    <span>Delete Chat</span>
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            );
-          })}
-        </div>
-      </ScrollArea>
-
-      {/* Footer with user profile dropdown and new chat button */}
-      <div
-        className={cn(
-          "p-3 sm:p-4 border-t border-border/50 flex",
-          isExpanded
-            ? "justify-between items-center"
-            : "flex-col gap-4 items-center justify-center pb-6"
-        )}
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              className={cn(
-                "rounded-full",
-                isExpanded
-                  ? "flex gap-2 items-center h-10 pr-2"
-                  : "h-10 w-10 collapsed-avatar"
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
-            >
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user.imageUrl} />
-                <AvatarFallback>
-                  {user.firstName?.[0]?.toUpperCase() || "U"}
-                </AvatarFallback>
-              </Avatar>
-              {isExpanded && (
-                <>
-                  <span className="text-sm font-medium truncate max-w-[100px]">
-                    {user.fullName || user.username || "User"}
-                  </span>
-                  <ChevronDownIcon className="h-4 w-4 text-muted-foreground" />
-                </>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align={isExpanded ? "end" : "center"}
-            className="w-56"
-          >
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="h-10 cursor-pointer">
-              <UserIcon className="mr-2 h-4 w-4" />
-              <span>Profile</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="h-10 cursor-pointer">
-              <SettingsIcon className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => clerk.signOut()} className="h-10 cursor-pointer">
-              <LogOutIcon className="mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button
-          variant="secondary"
-          onClick={onNewChat}
-          title="New Chat"
-          className={cn(
-            "rounded-full transition-all h-10 w-10",
-            !isExpanded && "collapsed-avatar"
-          )}
-        >
-          <MessageSquarePlus className="h-5 w-5" />
-          {isExpanded && <span className="sr-only">New Chat</span>}
-        </Button>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Rename Chat Dialog */}
+      {/* Rename Dialog */}
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename Chat</DialogTitle>
             <DialogDescription>
-              Enter a new name for this conversation.
+              Enter a new name for this chat.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
-              <Input
-                id="name"
-                value={newChatName}
-                onChange={(e) => setNewChatName(e.target.value)}
-                className="col-span-3"
-                placeholder="e.g., Project Discussion"
-              />
-            </div>
-          </div>
+          <Input
+            value={newChatName}
+            onChange={(e) => setNewChatName(e.target.value)}
+            placeholder="Enter new chat name"
+          />
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsRenameDialogOpen(false);
-                setChatToRename(null);
-                setNewChatName("");
-              }}
-            >
+            <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRenameChat} type="submit">
-              Save Changes
+            <Button onClick={handleRenameChat}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Chat Confirmation Dialog */}
+      {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Chat</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this chat? This action cannot be
-              undone.
+              Are you sure you want to delete this chat? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsDeleteDialogOpen(false);
-                setChatToDelete(null);
-              }}
-            >
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDeleteChat}>

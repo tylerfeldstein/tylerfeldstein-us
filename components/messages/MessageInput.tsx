@@ -1,17 +1,14 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Loader2, Smile } from "lucide-react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { SendHorizontal } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useUser } from "@clerk/nextjs";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 interface MessageInputProps {
@@ -21,11 +18,11 @@ interface MessageInputProps {
 export function MessageInput({ chatId }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { resolvedTheme } = useTheme();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useUser();
-  const [safeAreaBottom, setSafeAreaBottom] = useState<number>(0);
   const [originalViewport, setOriginalViewport] = useState<string | null>(null);
+  const lastTypingUpdate = useRef<number>(0);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const sendMessage = useMutation(api.secureMessages.sendMessageSecure);
   const setTypingStatus = useMutation(api.secureMessages.setTypingStatusSecure);
@@ -33,14 +30,33 @@ export function MessageInput({ chatId }: MessageInputProps) {
   // Update viewport and safe area measurements
   useEffect(() => {
     const updateViewportMeasurements = () => {
-      // Get visual viewport height
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      if (!window.visualViewport) return;
       
-      // Estimate safe area bottom on iOS
-      // Default iOS toolbar height is roughly 83px in Safari
-      const estimatedSafeBottom = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 
-        Math.max(window.innerHeight - vh, 0) : 0;
-      setSafeAreaBottom(estimatedSafeBottom);
+      // Calculate keyboard height
+      const keyboardHeight = Math.max(window.innerHeight - window.visualViewport.height, 0);
+      
+      // Get header heights
+      const navbarElement = document.querySelector('nav') as HTMLElement;
+      const chatHeaderElement = document.querySelector('.chat-header') as HTMLElement;
+      const headerHeight = (navbarElement?.offsetHeight || 0) + (chatHeaderElement?.offsetHeight || 0);
+      
+      // Get input height
+      const inputContainer = document.querySelector('.message-input-container') as HTMLElement;
+      const inputHeight = inputContainer?.offsetHeight || 0;
+      
+      // Update CSS variables
+      document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+      document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+      document.documentElement.style.setProperty('--input-height', `${inputHeight}px`);
+      
+      // Scroll to the last message
+      if (keyboardHeight > 0) {
+        requestAnimationFrame(() => {
+          const messageList = document.querySelector('.message-list-container');
+          const lastMessage = messageList?.querySelector('.message:last-child');
+          lastMessage?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
+      }
     };
 
     // Initial measurement
@@ -49,12 +65,15 @@ export function MessageInput({ chatId }: MessageInputProps) {
     // Update on resize and scroll
     window.visualViewport?.addEventListener('resize', updateViewportMeasurements);
     window.visualViewport?.addEventListener('scroll', updateViewportMeasurements);
-    window.addEventListener('resize', updateViewportMeasurements);
     
     return () => {
       window.visualViewport?.removeEventListener('resize', updateViewportMeasurements);
       window.visualViewport?.removeEventListener('scroll', updateViewportMeasurements);
-      window.removeEventListener('resize', updateViewportMeasurements);
+      
+      // Clean up CSS variables
+      document.documentElement.style.removeProperty('--keyboard-height');
+      document.documentElement.style.removeProperty('--header-height');
+      document.documentElement.style.removeProperty('--input-height');
     };
   }, []);
 
@@ -72,8 +91,14 @@ export function MessageInput({ chatId }: MessageInputProps) {
       if (viewportMeta) {
         viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
       }
-      // Add keyboard-visible class to body when keyboard appears
       document.body.classList.add('keyboard-visible');
+      
+      // Scroll to the last message after a short delay
+      setTimeout(() => {
+        const messageList = document.querySelector('.message-list-container');
+        const lastMessage = messageList?.querySelector('.message:last-child');
+        lastMessage?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
     };
 
     const handleInputBlur = () => {
@@ -81,8 +106,12 @@ export function MessageInput({ chatId }: MessageInputProps) {
       if (viewportMeta && originalViewport) {
         viewportMeta.setAttribute('content', originalViewport);
       }
-      // Remove keyboard-visible class from body when keyboard disappears
       document.body.classList.remove('keyboard-visible');
+      
+      // Clean up CSS variables
+      document.documentElement.style.removeProperty('--keyboard-height');
+      document.documentElement.style.removeProperty('--header-height');
+      document.documentElement.style.removeProperty('--input-height');
     };
 
     // Add event listeners to the textarea
@@ -98,120 +127,100 @@ export function MessageInput({ chatId }: MessageInputProps) {
         textarea.removeEventListener('focus', handleInputFocus);
         textarea.removeEventListener('blur', handleInputBlur);
       }
-      // Make sure we remove the class when component unmounts
       document.body.classList.remove('keyboard-visible');
+      
+      // Clean up CSS variables
+      document.documentElement.style.removeProperty('--keyboard-height');
+      document.documentElement.style.removeProperty('--header-height');
+      document.documentElement.style.removeProperty('--input-height');
     };
   }, [originalViewport]);
 
   // Auto resize textarea
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "inherit";
+      // Reset height to auto to get the correct scrollHeight
+      textareaRef.current.style.height = 'auto';
+      // Set new height based on scrollHeight
       const scrollHeight = textareaRef.current.scrollHeight;
-      textareaRef.current.style.height = `${Math.min(scrollHeight, 120)}px`;
+      // Limit max height to ~4 lines of text (176px)
+      textareaRef.current.style.height = `${Math.min(scrollHeight, 176)}px`;
     }
   }, [message]);
 
-  // Update typing status
-  useEffect(() => {
-    // Skip the effect if chatId is null or no user
-    if (!chatId || !user) return;
-    
-    let typingTimeout: NodeJS.Timeout;
-    
-    if (message.trim()) {
-      try {
-        setTypingStatus({ 
-          chatId, 
-          isTyping: true,
-          tokenPayload: {
-            userId: user.id,
-            userRole: "user", // This will be overridden by server-side check
-            exp: 0, // These will be filled by server
-            iat: 0,
-            jti: "" // This will be filled by server
-          }
-        }).catch(err => {
-          // Silently handle errors for typing status to prevent UI disruption
-          console.error("Error setting typing status:", err);
-        });
-      } catch (error) {
-        console.error("Error initiating typing status:", error);
+  // Function to update typing status with rate limiting
+  const updateTypingStatus = useCallback(async () => {
+    if (!user || !chatId) return;
+
+    const now = Date.now();
+    // Only update if it's been more than 1 minute since last update
+    if (now - lastTypingUpdate.current < 60000) {
+      return;
+    }
+
+    try {
+      await setTypingStatus({
+        chatId,
+        isTyping: true,
+        tokenPayload: {
+          userId: user.id,
+          userRole: "user",
+          exp: 0,
+          iat: 0,
+          jti: ""
+        }
+      });
+      lastTypingUpdate.current = now;
+
+      // Clear any existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
       }
-      
-      // Clear the typing status after 2 seconds of no input
-      typingTimeout = setTimeout(() => {
+
+      // Set a new timeout to clear typing status after 30 seconds
+      typingTimeoutRef.current = setTimeout(async () => {
         try {
-          setTypingStatus({ 
-            chatId, 
+          await setTypingStatus({
+            chatId,
             isTyping: false,
             tokenPayload: {
               userId: user.id,
-              userRole: "user", // This will be overridden by server-side check
-              exp: 0, // These will be filled by server
+              userRole: "user",
+              exp: 0,
               iat: 0,
-              jti: "" // This will be filled by server
+              jti: ""
             }
-          }).catch(err => {
-            // Silently handle errors
-            console.error("Error clearing typing status:", err);
           });
         } catch (error) {
           console.error("Error clearing typing status:", error);
         }
-      }, 2000);
+      }, 30000);
+    } catch (error) {
+      console.error("Error updating typing status:", error);
     }
-    
-    return () => {
-      if (typingTimeout) clearTimeout(typingTimeout);
-    };
-  }, [message, chatId, setTypingStatus, user]);
-  
-  // Cleanup typing status when component unmounts or chat changes
-  useEffect(() => {
-    // Skip if no chatId or user
-    if (!chatId || !user) return;
-    
-    // Cleanup function to clear typing status
-    const cleanup = () => {
-      try {
-        setTypingStatus({
-          chatId,
-          isTyping: false,
-          tokenPayload: {
-            userId: user.id,
-            userRole: "user",
-            exp: 0,
-            iat: 0,
-            jti: ""
-          }
-        }).catch(err => {
-          console.error("Error clearing typing status on cleanup:", err);
-        });
-      } catch (error) {
-        console.error("Error clearing typing status on cleanup:", error);
-      }
-    };
-    
-    // Add window beforeunload handler to clean up typing status when user leaves
-    const handleBeforeUnload = () => {
-      cleanup();
-    };
-    
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    // Clear typing status when component unmounts or chat changes
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      cleanup();
-    };
   }, [chatId, user, setTypingStatus]);
 
-  // If no chat is selected, don't render the input
-  if (!chatId) {
-    return null;
-  }
+  // Handle message changes
+  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newMessage = e.target.value;
+    setMessage(newMessage);
 
+    // Only trigger typing indicator when starting to type
+    if (newMessage.length > 0 && message.length === 0) {
+      updateTypingStatus();
+    }
+  };
+
+  // Clear typing status on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle message submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -220,22 +229,9 @@ export function MessageInput({ chatId }: MessageInputProps) {
     try {
       setIsSubmitting(true);
       
-      // Clear typing status when sending a message
-      try {
-        await setTypingStatus({ 
-          chatId, 
-          isTyping: false,
-          tokenPayload: {
-            userId: user?.id || "",
-            userRole: "user", // This will be overridden by server-side check
-            exp: 0, // These will be filled by server
-            iat: 0,
-            jti: "" // This will be filled by server
-          }
-        });
-      } catch (error) {
-        console.error("Error clearing typing status:", error);
-        // Continue with message send even if typing status fails
+      // Clear typing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
       }
       
       const result = await sendMessage({ 
@@ -243,10 +239,10 @@ export function MessageInput({ chatId }: MessageInputProps) {
         content: message,
         tokenPayload: {
           userId: user?.id || "",
-          userRole: "user", // This will be overridden by server-side check
-          exp: 0, // These will be filled by server
+          userRole: "user",
+          exp: 0,
           iat: 0,
-          jti: "" // This will be filled by server
+          jti: ""
         }
       });
       
@@ -257,9 +253,9 @@ export function MessageInput({ chatId }: MessageInputProps) {
       }
       
       setMessage("");
+      lastTypingUpdate.current = 0; // Reset typing update timer
     } catch (error) {
       console.error("Failed to send message:", error);
-      // Show user-friendly error message
       if (typeof error === 'object' && error !== null && 'message' in error) {
         const errorMessage = (error as Error).message;
         if (errorMessage.includes("not found") || errorMessage.includes("Chat not found")) {
@@ -275,163 +271,72 @@ export function MessageInput({ chatId }: MessageInputProps) {
     }
   };
 
-  const isDarkTheme = resolvedTheme === "dark";
 
   return (
     <div 
-      className="fixed left-0 right-0 w-full" 
-      style={{ 
-        bottom: `${safeAreaBottom}px`,
-        zIndex: 30
-      }}
+      className={cn(
+        "message-input-container",
+        "flex items-center gap-2 p-4",
+        "fixed bottom-0",
+        "border-t border-border/10",
+        "before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-t",
+        "before:from-background/95 before:via-background/50 before:to-transparent",
+        "before:backdrop-blur-md",
+        // Position and width calculations based on sidebar state
+        "left-0 w-full",
+        "md:left-[70px] md:w-[calc(100%-70px)]",
+        "lg:left-[var(--sidebar-width,350px)] lg:w-[calc(100%-var(--sidebar-width,350px))]",
+        // Handle mobile keyboard
+        "keyboard-visible:left-0 keyboard-visible:w-full",
+        "md:keyboard-visible:left-[70px] md:keyboard-visible:w-[calc(100%-70px)]",
+        "lg:keyboard-visible:left-[var(--sidebar-width,350px)] lg:keyboard-visible:w-[calc(100%-var(--sidebar-width,350px))]"
+      )}
     >
-      <div className={cn(
-        "px-2 sm:px-4 md:px-8 pb-3 pb-safe sm:pb-4 md:pb-6 pt-8 sm:pt-10",
-        "bg-gradient-to-t",
-        isDarkTheme 
-          ? "from-[#1a0920]/90 via-[#220a2a]/70 to-transparent" 
-          : "from-blue-50/90 via-blue-50/70 to-transparent"
-      )}>
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-          className="max-w-3xl w-full mx-auto"
-        >
-          <form 
-            onSubmit={handleSubmit}
-            className={cn(
-              "relative rounded-2xl overflow-hidden shadow-lg transition-all duration-300",
-              "border backdrop-blur-md",
-              isDarkTheme 
-                ? "border-slate-700/50 bg-slate-900/70 shadow-slate-900/20" 
-                : "border-blue-200 bg-white/90 shadow-blue-100/50",
-              message.trim() ? "ring-2 ring-primary/20" : ""
-            )}
-          >
-            <Textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-              placeholder="Type your message here..."
-              className={cn(
-                "min-h-[56px] md:min-h-[60px] resize-none p-3 sm:p-4 pr-20 sm:pr-24",
-                "border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                "placeholder:text-muted-foreground/60",
-                isDarkTheme 
-                  ? "bg-transparent text-white/90" 
-                  : "bg-transparent text-gray-900",
-                "text-sm md:text-base transition-colors"
-              )}
-              style={{ fontSize: '16px' }}
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck="true"
-              data-gramm="false"
-            />
-            
-            <div className="absolute right-1 sm:right-2 bottom-1 sm:bottom-2 flex items-center gap-1 sm:gap-1.5">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-9 w-9 sm:h-9 sm:w-9 rounded-xl transition-colors",
-                        isDarkTheme 
-                          ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" 
-                          : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-                      )}
-                    >
-                      <Smile className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="sr-only">Add emoji</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p className="text-xs">Add emoji (coming soon)</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-9 w-9 sm:h-9 sm:w-9 rounded-xl transition-colors",
-                        isDarkTheme 
-                          ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800" 
-                          : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-                      )}
-                    >
-                      <Paperclip className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="sr-only">Attach file</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p className="text-xs">Attach file (coming soon)</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
-              <AnimatePresence mode="wait">
-                {isSubmitting ? (
-                  <motion.div
-                    key="loading"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    className="h-10 w-10 sm:h-10 sm:w-10 flex items-center justify-center"
-                  >
-                    <Loader2 className="h-5 w-5 sm:h-5 sm:w-5 animate-spin text-primary" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="button"
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                  >
-                    <Button 
-                      type="submit" 
-                      size="icon" 
-                      className={cn(
-                        "h-10 w-10 sm:h-10 sm:w-10 rounded-xl shadow-sm",
-                        !message.trim() && "opacity-50 cursor-not-allowed"
-                      )}
-                      disabled={!message.trim() || isSubmitting}
-                    >
-                      <Send className="h-5 w-5 sm:h-5 sm:w-5" />
-                      <span className="sr-only">Send</span>
-                    </Button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </form>
-          
-          <div className="mt-2 text-[10px] text-center text-muted-foreground/70">
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              Chat Developed By Tyler Feldstein
-            </motion.span>
-          </div>
-        </motion.div>
+      <div className="relative flex-1 w-full max-w-3xl mx-auto">
+        <Textarea
+          ref={textareaRef}
+          placeholder="Type your message here..."
+          value={message}
+          onChange={handleMessageChange}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit(e);
+            }
+          }}
+          className={cn(
+            "min-h-[44px] max-h-[176px] w-full",
+            "resize-none overflow-x-hidden overflow-y-auto",
+            "whitespace-pre-wrap break-words",
+            "px-4 py-2.5",
+            "focus:ring-0 focus:ring-offset-0 focus:outline-none",
+            "rounded-md border border-input/50",
+            "placeholder:text-foreground/50",
+            "text-sm leading-relaxed",
+            "bg-background/40 dark:bg-background/60",
+            "backdrop-blur-md",
+            "shadow-sm",
+            "transition-colors duration-200",
+            "focus:bg-background/60 dark:focus:bg-background/80",
+            "hover:bg-background/50 dark:hover:bg-background/70"
+          )}
+          rows={1}
+        />
       </div>
+      
+      <Button 
+        type="submit"
+        size="icon"
+        disabled={!message.trim()}
+        onClick={handleSubmit}
+        className={cn(
+          "flex-shrink-0 rounded-full",
+          "bg-primary/90 hover:bg-primary",
+          "text-primary-foreground"
+        )}
+      >
+        <SendHorizontal className="h-4 w-4" />
+      </Button>
     </div>
   );
 } 
