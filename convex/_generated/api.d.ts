@@ -18,6 +18,7 @@ import type * as auth from "../auth.js";
 import type * as chatAuth from "../chatAuth.js";
 import type * as chatTokens from "../chatTokens.js";
 import type * as crons from "../crons.js";
+import type * as inngestIntegration from "../inngestIntegration.js";
 import type * as inngestResults from "../inngestResults.js";
 import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   chatAuth: typeof chatAuth;
   chatTokens: typeof chatTokens;
   crons: typeof crons;
+  inngestIntegration: typeof inngestIntegration;
   inngestResults: typeof inngestResults;
   maintenance: typeof maintenance;
   messages: typeof messages;

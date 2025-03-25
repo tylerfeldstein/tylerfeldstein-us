@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm-run-all --parallel dev:frontend dev:backend",
+    "dev": "npm-run-all --parallel dev:frontend dev:backend dev:inngest",
     "dev:frontend": "next dev --turbopack",
     "dev:backend": "convex dev",
+    "dev:inngest": "npx inngest-cli@latest dev -u http://localhost:3000/api/inngest --no-discovery",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -88,6 +89,7 @@
     "@types/xxhashjs": "^0.2.4",
     "eslint": "^9",
     "eslint-config-next": "15.2.3",
+    "inngest-cli": "^1.5.5",
     "next": "15.2.3",
     "npm-run-all": "^4.1.5",
     "prettier": "^3.5.3",

@@ -3,6 +3,97 @@ import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
 import { JWTPayload } from "./types/jwt";
+import { internalAction } from "./_generated/server";
+
+// Action to send a chat creation event to Inngest via HTTP
+export const sendChatCreatedEvent = internalAction({
+  args: {
+    chatId: v.string(),
+    name: v.string(),
+    createdBy: v.string(),
+    participantIds: v.array(v.string()),
+    createdAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      // Get base URL from environment or use default for local development
+      const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+      
+      // Send the event to Inngest via API endpoint
+      const response = await fetch(`${baseUrl}/api/inngest/event`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "chat/chat.created",
+          data: {
+            chatId: args.chatId,
+            name: args.name,
+            createdBy: args.createdBy,
+            participantIds: args.participantIds,
+            createdAt: args.createdAt,
+          },
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to send chat creation event: ${response.statusText}`);
+      }
+      
+      console.log(`Sent chat creation event to Inngest for chat ${args.chatId}`);
+      return { success: true };
+    } catch (error) {
+      console.error("Error sending chat creation event to Inngest:", error);
+      return { success: false, error: String(error) };
+    }
+  },
+});
+
+// Action to send a message creation event to Inngest
+export const sendMessageCreatedEvent = internalAction({
+  args: {
+    chatId: v.string(),
+    messageId: v.string(),
+    senderId: v.string(),
+    content: v.string(),
+    timestamp: v.number(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      // Get base URL from environment or use default for local development
+      const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+      
+      // Send the event to Inngest via API endpoint
+      const response = await fetch(`${baseUrl}/api/inngest/event`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "chat/message.created",
+          data: {
+            chatId: args.chatId,
+            messageId: args.messageId,
+            senderId: args.senderId,
+            content: args.content,
+            timestamp: args.timestamp,
+          },
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to send message creation event: ${response.statusText}`);
+      }
+      
+      console.log(`Sent message creation event to Inngest for message ${args.messageId} in chat ${args.chatId}`);
+      return { success: true };
+    } catch (error) {
+      console.error("Error sending message creation event to Inngest:", error);
+      return { success: false, error: String(error) };
+    }
+  },
+});
 
 /**
  * Get messages for a chat with token authentication
@@ -261,6 +352,18 @@ export const sendMessageSecure = mutation({
       
       // Update the chat with new timestamp and potentially new participant
       await ctx.db.patch(args.chatId, chatUpdates);
+      
+      // Send event to Inngest
+      await ctx.scheduler.runAfter(0, api.inngestIntegration.sendInngestEvent, {
+        eventName: "chat/message.created",
+        eventData: {
+          chatId: args.chatId.toString(),
+          messageId: messageId.toString(),
+          senderId: userId,
+          content: args.content,
+          timestamp: Date.now(),
+        }
+      });
       
       return {
         success: true,
@@ -589,7 +692,7 @@ export const createChatSecure = mutation({
       console.log(`[createChatSecure] Created chat ${chatId}`);
       
       // Create the initial message
-      await ctx.db.insert("messages", {
+      const messageId = await ctx.db.insert("messages", {
         chatId,
         content: args.initialMessage,
         sender: userId,
@@ -597,6 +700,30 @@ export const createChatSecure = mutation({
         read: [userId],
         isAdmin: isAdmin,
         isSystemMessage: true
+      });
+      
+      // Send event to Inngest for chat creation
+      await ctx.scheduler.runAfter(0, api.inngestIntegration.sendInngestEvent, {
+        eventName: "chat/chat.created",
+        eventData: {
+          chatId: chatId.toString(),
+          name: args.name,
+          createdBy: userId,
+          participantIds: [userId, ...args.participantIds],
+          createdAt: Date.now(),
+        }
+      });
+      
+      // Send event to Inngest for the initial message
+      await ctx.scheduler.runAfter(0, api.inngestIntegration.sendInngestEvent, {
+        eventName: "chat/message.created",
+        eventData: {
+          chatId: chatId.toString(),
+          messageId: messageId.toString(),
+          senderId: userId,
+          content: args.initialMessage,
+          timestamp: Date.now(),
+        }
       });
       
       return { success: true, error: null, chatId };

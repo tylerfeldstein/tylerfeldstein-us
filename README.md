@@ -137,7 +137,48 @@ To deploy your application:
 3. Configure environment variables on your hosting platform
 4. Deploy your Convex backend with `npx convex deploy`
 
+## Inngest Integration
 
+This project uses [Inngest](https://www.inngest.com) for background job processing and event-driven workflows. The integration enables reliable asynchronous processing for various tasks.
+
+### Setup
+
+1. **Development Environment**
+   - Run `pnpm dev` to start the Next.js server, Convex backend, and Inngest Dev Server
+   - The Inngest Dev Server dashboard is available at http://localhost:8288
+   - No API keys are needed for local development
+
+2. **Production Environment**
+   - Create an account at [Inngest](https://www.inngest.com) and get your API keys
+   - Add the keys to your environment variables (see below)
+   - Deploy your Next.js application with the Inngest integration
+
+### Environment Variables
+
+For local development, set Convex environment variables:
+```bash
+npx convex env set NEXT_PUBLIC_URL http://host.docker.internal:3000
+```
+
+For production, update the URL to your actual deployment:
+```bash
+npx convex env set NEXT_PUBLIC_URL https://your-production-url.com
+```
+
+For detailed information about environment variables, see [convex/README-ENVIRONMENT.md](./convex/README-ENVIRONMENT.md).
+
+### Available Workflows
+
+- **Chat Message Notification**: Triggered when a message is sent in a chat
+- **Chat Created Notification**: Triggered when a new chat is created
+
+### Adding New Workflows
+
+To add new Inngest workflows:
+
+1. Create new function files in `inngest/functions/`
+2. Register them in `app/api/inngest/route.ts`
+3. Trigger them by sending events from Convex
 
 ## simple agent chat
 ```
