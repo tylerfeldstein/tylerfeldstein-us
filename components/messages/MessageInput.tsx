@@ -25,6 +25,7 @@ export function MessageInput({ chatId }: MessageInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useUser();
   const [safeAreaBottom, setSafeAreaBottom] = useState<number>(0);
+  const [originalViewport, setOriginalViewport] = useState<string | null>(null);
 
   const sendMessage = useMutation(api.secureMessages.sendMessageSecure);
   const setTypingStatus = useMutation(api.secureMessages.setTypingStatusSecure);
@@ -56,6 +57,51 @@ export function MessageInput({ chatId }: MessageInputProps) {
       window.removeEventListener('resize', updateViewportMeasurements);
     };
   }, []);
+
+  // Prevent page zoom when input is focused on mobile
+  useEffect(() => {
+    // Store the original viewport meta tag content
+    const viewportMeta = document.querySelector('meta[name="viewport"]');
+    if (viewportMeta) {
+      setOriginalViewport(viewportMeta.getAttribute('content'));
+    }
+
+    // Function to handle focus/blur events
+    const handleInputFocus = () => {
+      const viewportMeta = document.querySelector('meta[name="viewport"]');
+      if (viewportMeta) {
+        viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+      // Add keyboard-visible class to body when keyboard appears
+      document.body.classList.add('keyboard-visible');
+    };
+
+    const handleInputBlur = () => {
+      const viewportMeta = document.querySelector('meta[name="viewport"]');
+      if (viewportMeta && originalViewport) {
+        viewportMeta.setAttribute('content', originalViewport);
+      }
+      // Remove keyboard-visible class from body when keyboard disappears
+      document.body.classList.remove('keyboard-visible');
+    };
+
+    // Add event listeners to the textarea
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.addEventListener('focus', handleInputFocus);
+      textarea.addEventListener('blur', handleInputBlur);
+    }
+
+    // Cleanup event listeners
+    return () => {
+      if (textarea) {
+        textarea.removeEventListener('focus', handleInputFocus);
+        textarea.removeEventListener('blur', handleInputBlur);
+      }
+      // Make sure we remove the class when component unmounts
+      document.body.classList.remove('keyboard-visible');
+    };
+  }, [originalViewport]);
 
   // Auto resize textarea
   useEffect(() => {
@@ -283,6 +329,11 @@ export function MessageInput({ chatId }: MessageInputProps) {
                   : "bg-transparent text-gray-900",
                 "text-sm md:text-base transition-colors"
               )}
+              style={{ fontSize: '16px' }}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck="true"
+              data-gramm="false"
             />
             
             <div className="absolute right-1 sm:right-2 bottom-1 sm:bottom-2 flex items-center gap-1 sm:gap-1.5">
