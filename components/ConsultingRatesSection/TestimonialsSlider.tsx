@@ -139,7 +139,7 @@ const TestimonialsSlider = () => {
                 
                 {/* Quote */}
                 <blockquote className="text-lg md:text-xl font-medium text-foreground/90 mb-6">
-                  "{currentTestimonial.quote}"
+                  &quot;{currentTestimonial.quote}&quot;
                 </blockquote>
                 
                 {/* Author */}

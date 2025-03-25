@@ -1,8 +1,7 @@
 "use client";
 
-import React from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import Image from 'next/image';
-import { useTheme } from 'next-themes';
 
 // Animation container for continuous scrolling effect
 const InfiniteMovingCards = ({ 
@@ -21,8 +20,8 @@ const InfiniteMovingCards = ({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const scrollerRef = React.useRef<HTMLUListElement>(null);
 
-  // Calculate animation duration based on speed
-  const getSpeed = () => {
+  // Calculate animation duration based on speed - wrapped in useCallback to avoid dependencies warning
+  const getSpeed = useCallback(() => {
     switch (speed) {
       case "slow":
         return 40;
@@ -33,7 +32,7 @@ const InfiniteMovingCards = ({
       default:
         return 40;
     }
-  };
+  }, [speed]);
 
   React.useEffect(() => {
     if (!containerRef.current || !scrollerRef.current) return;
@@ -77,7 +76,7 @@ const InfiniteMovingCards = ({
     return () => {
       animation.cancel();
     };
-  }, [direction, pauseOnHover, speed]);
+  }, [direction, pauseOnHover, speed, getSpeed]);
 
   return (
     <div
@@ -93,7 +92,7 @@ const InfiniteMovingCards = ({
             key={idx}
             className="flex items-center justify-center flex-shrink-0 w-[180px] md:w-[240px] p-4 hover:scale-110 transition-transform duration-300"
           >
-            <div className="flex items-center justify-center w-full h-full">
+            <div className="flex items-center justify-center w-full h-full bg-white/10 backdrop-blur-sm rounded-lg p-4 shadow-sm">
               {item.logo}
             </div>
           </li>
@@ -105,112 +104,93 @@ const InfiniteMovingCards = ({
 
 // Main component
 const LogoScroll = () => {
-  const { resolvedTheme } = useTheme();
-  const isDarkMode = resolvedTheme === 'dark';
+  const [, setMounted] = useState(false);
+  
+  // Only enable theme detection after component mounts
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+
 
   // Company logos from resume
   const companies = [
     {
       name: "Everbridge",
       logo: (
-        <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <div className="bg-white/70 p-4 rounded-md shadow-sm">
-            <Image 
-              src={isDarkMode ? "/companies/everbridge_dark.svg" : "/companies/everbridge.png"} 
-              alt="Everbridge - Company where Tyler Feldstein applied AI security expertise" 
-              width={180} 
-              height={72} 
-              className="object-contain h-18 filter hover:drop-shadow-md" 
-            />
-          </div>
-        </div>
+        <Image 
+          src="/companies/everbridge.png" 
+          alt="Everbridge - Company where Tyler Feldstein applied AI security expertise" 
+          width={180} 
+          height={72} 
+          className="object-contain h-18" 
+        />
       )
     },
     {
       name: "Warner Bros. Discovery",
       logo: (
-        <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <div className="bg-white/70 p-4 rounded-md shadow-sm">
-            <Image 
-              src="/companies/Warner_Bros._Discovery.png" 
-              alt="Warner Bros. Discovery - Where Tyler Feldstein worked as a Cybersecurity Architect" 
-              width={180} 
-              height={72} 
-              className={`object-contain h-18 filter hover:drop-shadow-md ${isDarkMode ? 'brightness-0 invert' : ''}`}
-            />
-          </div>
-        </div>
+        <Image 
+          src="/companies/Warner_Bros._Discovery.png" 
+          alt="Warner Bros. Discovery - Where Tyler Feldstein worked as a Cybersecurity Architect" 
+          width={180} 
+          height={72} 
+          className="object-contain h-18"
+        />
       )
     },
     {
       name: "CACI",
       logo: (
-        <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <div className="bg-white/70 p-4 rounded-md shadow-sm">
-            <Image 
-              src={isDarkMode ? "/companies/caci_dark.svg" : "/companies/caci.svg"} 
-              alt="CACI - Where Tyler Feldstein implemented AI security solutions" 
-              width={180} 
-              height={72} 
-              className="object-contain h-18 filter hover:drop-shadow-md" 
-            />
-          </div>
-        </div>
+        <Image 
+          src="/companies/caci.svg" 
+          alt="CACI - Where Tyler Feldstein implemented AI security solutions" 
+          width={180} 
+          height={72} 
+          className="object-contain h-18" 
+        />
       )
     },
     {
       name: "T-Mobile",
       logo: (
-        <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <div className="bg-white/70 p-4 rounded-md shadow-sm">
-            <Image 
-              src="/companies/tmobile.svg" 
-              alt="T-Mobile - Where Tyler Feldstein developed cloud security architecture" 
-              width={180} 
-              height={72} 
-              className={`object-contain h-18 filter hover:drop-shadow-md ${isDarkMode ? 'brightness-0 invert' : ''}`}
-            />
-          </div>
-        </div>
+        <Image 
+          src="/companies/tmobile.svg" 
+          alt="T-Mobile - Where Tyler Feldstein developed cloud security architecture" 
+          width={180} 
+          height={72} 
+          className="object-contain h-18"
+        />
       )
     },
     {
       name: "US Army",
       logo: (
-        <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <div className="bg-white/70 p-4 rounded-md shadow-sm">
-            <Image 
-              src="/companies/army.png" 
-              alt="US Army" 
-              width={180} 
-              height={72} 
-              className={`object-contain h-18 filter hover:drop-shadow-md ${isDarkMode ? 'brightness-0 invert' : ''}`}
-            />
-          </div>
-        </div>
+        <Image 
+          src="/companies/army.png" 
+          alt="US Army" 
+          width={180} 
+          height={72} 
+          className="object-contain h-18"
+        />
       )
     },
     {
       name: "Department of Defense",
       logo: (
-        <div className="flex items-center justify-center h-18 w-auto opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out">
-          <div className="bg-white/70 p-4 rounded-md shadow-sm">
-            <Image 
-              src="/companies/dod.png" 
-              alt="Department of Defense" 
-              width={180} 
-              height={72} 
-              className={`object-contain h-18 filter hover:drop-shadow-md ${isDarkMode ? 'brightness-0 invert' : ''}`}
-            />
-          </div>
-        </div>
+        <Image 
+          src="/companies/dod.png" 
+          alt="Department of Defense" 
+          width={180} 
+          height={72} 
+          className="object-contain h-18"
+        />
       )
     }
   ];
 
   return (
     <section className="w-full overflow-hidden">
-      {/* Main content with transparent background */}
       <div className="py-10 w-full">
         <div className="w-full max-w-7xl mx-auto">
           <div className="flex flex-col items-center justify-center mb-10">
@@ -232,8 +212,6 @@ const LogoScroll = () => {
           </div>
         </div>
       </div>
-      
-      {/* Removed the bottom gradient transition */}
     </section>
   );
 };

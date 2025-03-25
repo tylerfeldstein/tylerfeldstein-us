@@ -73,7 +73,7 @@ export function NewChatModal({ open, onClose, onChatCreated }: NewChatModalProps
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-w-[90%]">
         <DialogHeader>
           <DialogTitle>New Chat</DialogTitle>
         </DialogHeader>
@@ -84,6 +84,7 @@ export function NewChatModal({ open, onClose, onChatCreated }: NewChatModalProps
               value={chatName}
               onChange={(e) => setChatName(e.target.value)}
               placeholder="Enter chat name"
+              className="h-10"
             />
           </div>
           
@@ -117,7 +118,7 @@ export function NewChatModal({ open, onClose, onChatCreated }: NewChatModalProps
               value={initialMessage}
               onChange={(e) => setInitialMessage(e.target.value)}
               placeholder="Write an initial message"
-              className="resize-none"
+              className="resize-none min-h-[80px]"
               rows={3}
             />
           </div>
@@ -125,10 +126,10 @@ export function NewChatModal({ open, onClose, onChatCreated }: NewChatModalProps
           {error && <p className="text-red-500 text-sm">{error}</p>}
         </div>
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button variant="outline" onClick={onClose} disabled={isLoading} className="h-10">
             Cancel
           </Button>
-          <Button disabled={isLoading} onClick={handleCreateChat}>
+          <Button disabled={isLoading} onClick={handleCreateChat} className="h-10">
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

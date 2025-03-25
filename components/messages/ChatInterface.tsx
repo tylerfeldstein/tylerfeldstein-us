@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Id } from "@/convex/_generated/dataModel";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -10,20 +10,14 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { useUser } from "@clerk/nextjs";
 import {
-  BarChart,
   ChevronLeft,
   ChevronRight,
-  MessageSquare,
   MessageSquareIcon,
   MessageSquarePlus,
-  Settings,
-  Users2,
 } from "lucide-react";
 import { NewChatModal } from "./NewChatModal";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { EmptyStateMessage } from "./EmptyStateMessage";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -42,10 +36,10 @@ export function ChatInterface() {
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
   const previousChatIdRef = useRef<Id<"chats"> | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
   
   // Get chats for the current user
-  const chats = useQuery(api.messages.listChats) || [];
+  const chatsQuery = useQuery(api.messages.listChats);
+  const chats = useMemo(() => chatsQuery || [], [chatsQuery]);
   
   // Query the selected chat to verify it exists
   const selectedChat = useQuery(
@@ -286,13 +280,13 @@ export function ChatInterface() {
       }
       
       document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('touchmove', onMouseMove as any);
+      document.removeEventListener('touchmove', onMouseMove as unknown as EventListener);
       document.removeEventListener('mouseup', onMouseUp);
       document.removeEventListener('touchend', onMouseUp);
     };
     
     document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('touchmove', onMouseMove as any, { passive: false });
+    document.addEventListener('touchmove', onMouseMove as unknown as EventListener, { passive: false });
     document.addEventListener('mouseup', onMouseUp);
     document.addEventListener('touchend', onMouseUp);
   };
@@ -380,7 +374,7 @@ export function ChatInterface() {
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.2 }}
             onClick={() => setIsSidebarOpen(true)}
-            className="absolute top-3 left-3 z-50 rounded-full bg-background/80 backdrop-blur-sm p-2.5 shadow-lg border border-border/50 hover:bg-accent/30 transition-colors"
+            className="absolute top-3 left-3 z-50 rounded-full bg-background/80 backdrop-blur-sm p-2.5 shadow-lg border border-border/50 hover:bg-accent/30 transition-colors h-10 w-10 flex items-center justify-center"
           >
             <MessageSquareIcon className="h-5 w-5 text-foreground" />
           </motion.button>
@@ -412,8 +406,9 @@ export function ChatInterface() {
                 />
                 <div className="flex-1 overflow-hidden relative h-full">
                   <MessageList chatId={selectedChatId} />
+                  {/* MessageInput rendered with z-index to ensure it appears on top */}
+                  <MessageInput chatId={selectedChatId} />
                 </div>
-                <MessageInput chatId={selectedChatId} />
               </>
             ) : chatError ? (
               // Show error message when chat doesn't exist

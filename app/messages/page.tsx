@@ -19,14 +19,11 @@ export default function MessagesPage() {
   const currentUser = useQuery(api.users.getMe);
   
   // Use our existing hook for JWT token management
-  const { hasToken, generateChatTokens, isRefreshing, refreshError } = useChatCookieTokens();
+  const { hasToken, generateChatTokens, refreshError } = useChatCookieTokens();
   const [isGeneratingToken, setIsGeneratingToken] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [showError, setShowError] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState(0);
-  
-  // Loading state for essential data or initial token check
-  const isInitialLoading = !isLoaded || currentUser === undefined || hasToken === null;
   
   // Handle token generation when user is authenticated but has no token
   useEffect(() => {

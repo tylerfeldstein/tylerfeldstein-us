@@ -2,12 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { useTheme } from 'next-themes';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 
 const HeroSection = () => {
-  const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
@@ -60,12 +58,6 @@ const HeroSection = () => {
     //     </svg>
     //   )
     // }
-  ];
-
-  // Keywords for SEO optimization - for static rendering
-  const seoKeywords = [
-    "AI Engineer", "Cybersecurity Architect", "Cloud Security", "CISSP", "Zero Trust", 
-    "Machine Learning", "Threat Detection", "DevSecOps", "AWS", "Azure", "GCP"
   ];
 
   return (

@@ -154,7 +154,7 @@ export async function syncUser() {
     }
 
     // Log the request we're about to make
-    console.log(`Making request to Convex at: ${CONVEX_URL}/api/mutation`);
+    // console.log(`Making request to Convex at: ${CONVEX_URL}/api/mutation`);
     
     // Call Convex API directly with fetch, including Clerk user data
     const response = await fetch(`${CONVEX_URL}/api/mutation`, {
@@ -177,7 +177,7 @@ export async function syncUser() {
     });
 
     // Log detailed response information for debugging
-    console.log(`Sync user response status: ${response.status} ${response.statusText}`);
+    // console.log(`Sync user response status: ${response.status} ${response.statusText}`);
     
     if (!response.ok) {
       // Try to get response body for more detailed error information
@@ -216,7 +216,7 @@ export async function syncUser() {
         };
       }
       
-      console.log("User sync successful, Convex user ID:", convexUserId);
+      // console.log("User sync successful, Convex user ID:", convexUserId);
       return { success: true, userId: convexUserId };
     } catch (parseError) {
       console.error("Error parsing Convex response:", parseError);
@@ -256,7 +256,7 @@ export async function forceCreateUser() {
     const name = sessionClaims?.name as string || undefined;
     const pictureUrl = sessionClaims?.picture as string || undefined;
     
-    console.log("Force creating user in Convex:", { clerkId, email, name, hasImage: !!pictureUrl });
+    // console.log("Force creating user in Convex:", { clerkId, email, name, hasImage: !!pictureUrl });
     
     // Get a Convex token for the Clerk user
     const convexToken = await authObj.getToken({ template: "convex" });
@@ -288,7 +288,7 @@ export async function forceCreateUser() {
       })
     });
     
-    console.log(`Force create user response status: ${response.status} ${response.statusText}`);
+    // console.log(`Force create user response status: ${response.status} ${response.statusText}`);
     
     if (!response.ok) {
       const errorDetails = await response.text();
@@ -297,7 +297,7 @@ export async function forceCreateUser() {
     }
 
     const result = await response.json();
-    console.log("User created/updated successfully with ID:", result.value);
+    // console.log("User created/updated successfully with ID:", result.value);
     return { success: true, userId: result.value, userData };
   } catch (error) {
     console.error("Error creating user:", error);

@@ -16,7 +16,7 @@ export default function LeadDetectionTester() {
   const [chatId, setChatId] = useState<string>("");
   const [apiKey, setApiKey] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   /**

@@ -268,28 +268,28 @@ export async function chatJwtTokensExist() {
  */
 export async function verifyAccessToken() {
   try {
-    console.log("[verifyAccessToken] Starting token verification...");
+    // console.log("[verifyAccessToken] Starting token verification...");
     
     // Get access token from cookie
     const cookieStore = await cookies();
     const accessToken = cookieStore.get(ACCESS_COOKIE_NAME)?.value;
     
     if (!accessToken) {
-      console.log("[verifyAccessToken] No access token found in cookies");
+      // console.log("[verifyAccessToken] No access token found in cookies");
       return { success: false, error: "No access token found" };
     }
     
-    console.log("[verifyAccessToken] Found access token, verifying...");
+    // console.log("[verifyAccessToken] Found access token, verifying...");
     
     // Verify token
     const payload = await verifyJWTToken(accessToken);
     
     if (!payload || !payload.userId || !payload.jti) {
-      console.log("[verifyAccessToken] Token verification failed - invalid payload");
+      // console.log("[verifyAccessToken] Token verification failed - invalid payload");
       return { success: false, error: "Invalid token payload" };
     }
     
-    console.log("[verifyAccessToken] Token decoded successfully, checking invalidation...");
+    // console.log("[verifyAccessToken] Token decoded successfully, checking invalidation...");
     
     // Check if token is invalidated in Convex
     const tokenRecord = await convex.query(api.chatTokens.getByTokenId, { 

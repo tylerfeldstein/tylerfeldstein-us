@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { useUser } from '@clerk/nextjs';
@@ -84,7 +84,7 @@ const CareerSections = () => {
   };
 
   return (
-    <section className="py-16">
+    <section className="">
       {/* Introduction */}
       <div className="container mx-auto px-6 mb-12 md:mb-20">
         <motion.h2 
@@ -111,9 +111,9 @@ const CareerSections = () => {
           {/* Vertical timeline */}
           <div className="absolute left-1/2 -translate-x-1/2 w-1 h-full bg-primary/20 rounded-full" />
           
-          {/* Career cards with aligned dots */}
+          {/* Career cards with aligned dots - negative margins to create overlap */}
           {careerData.map((career, index) => (
-            <div key={career.id} className="relative mb-16">
+            <div key={career.id} className={`relative ${index > 0 ? 'mt-[-100px]' : 'mb-2'}`}>
               {/* Career card */}
               <div className={`flex items-center ${index % 2 === 0 ? '' : 'flex-row-reverse'}`}>
                 <div className={`w-[calc(50%-20px)] ${index % 2 === 0 ? 'pr-12' : 'pl-12'}`}>
@@ -183,20 +183,20 @@ const CareerSections = () => {
       
       {/* Mobile Stacked Card View (hidden on desktop) */}
       <div className="md:hidden container mx-auto px-4">
-        <div className="space-y-8">
+        <div className="space-y-4">
           {careerData.map((career, index) => (
             <motion.div
               key={career.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className={`p-6 relative rounded-2xl bg-gradient-to-b ${career.bgGradient} shadow-xl text-left`}
+              className={`p-4 relative rounded-2xl bg-gradient-to-b ${career.bgGradient} shadow-xl text-left`}
             >
               {/* Top section with logo and company info - keep same layout as desktop */}
-              <div className="flex mb-6">
+              <div className="flex mb-4">
                 {/* Logo on left - 30% width */}
                 <div className="w-[30%] flex items-start justify-start pr-4">
-                  <div className="w-full aspect-square flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl p-3">
+                  <div className="w-full aspect-square flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-xl p-2">
                     <Image
                       src={career.logo}
                       alt={career.company}
@@ -211,20 +211,20 @@ const CareerSections = () => {
                 {/* Company info - 70% width */}
                 <div className="w-[70%] text-left">
                   {/* Position title */}
-                  <h3 className="text-xl font-bold text-white mb-1">{career.position}</h3>
+                  <h3 className="text-lg font-bold text-white mb-1">{career.position}</h3>
                   
                   {/* Company name */}
-                  <h2 className="text-2xl font-extrabold text-white/90 mb-1">{career.company}</h2>
+                  <h2 className="text-xl font-extrabold text-white/90 mb-1">{career.company}</h2>
                   
                   {/* Period */}
-                  <p className="text-base text-white/60">{career.period}</p>
+                  <p className="text-sm text-white/60">{career.period}</p>
                 </div>
               </div>
               
               {/* Bottom section - Experience Overview */}
               <div className="text-left">
-                <h5 className="text-lg font-medium text-white mb-4">Experience Overview</h5>
-                <p className="text-white/90 leading-relaxed text-sm">{career.description}</p>
+                <h5 className="text-base font-medium text-white mb-2">Experience Overview</h5>
+                <p className="text-white/90 leading-relaxed text-xs">{career.description}</p>
               </div>
             </motion.div>
           ))}
@@ -239,7 +239,7 @@ const CareerSections = () => {
           transition={{ duration: 0.5 }}
           className="text-2xl md:text-3xl font-bold tracking-tight text-foreground mb-4 md:mb-6"
         >
-          Let's Connect
+          Let&apos;s Connect
         </motion.h2>
         <motion.p 
           initial={{ opacity: 0 }}
@@ -247,7 +247,7 @@ const CareerSections = () => {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="text-lg md:text-xl text-muted-foreground mb-6 md:mb-8 max-w-2xl mx-auto"
         >
-          I'm always interested in new opportunities and challenges.
+          I&apos;m always interested in new opportunities and challenges.
         </motion.p>
         <motion.button 
           whileHover={{ scale: 1.05 }}

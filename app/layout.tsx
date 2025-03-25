@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     creator: "@tylerfeldstein",
   },
   icons: {
-    icon: "/pepe-png-45776.svg",
+    icon: "/favicon_io/android-chrome-512x512.png",
   },
 };
 
@@ -72,7 +72,7 @@ export default function RootLayout({
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >

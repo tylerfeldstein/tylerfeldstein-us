@@ -27,13 +27,13 @@ export const createOrUpdateUser = mutation({
     }
 
     // Log identity information for debugging
-    console.log("User identity from token:", {
-      subject: identity.subject,
-      issuer: identity.tokenIdentifier.split(":")[0], // Just the issuer part
-      email: identity.email,
-      name: identity.name,
-      hasImage: !!identity.pictureUrl,
-    });
+    // console.log("User identity from token:", {
+    //   subject: identity.subject,
+    //   issuer: identity.tokenIdentifier.split(":")[0], // Just the issuer part
+    //   email: identity.email,
+    //   name: identity.name,
+    //   hasImage: !!identity.pictureUrl,
+    // });
 
     // Use provided args if available, otherwise fall back to identity data
     const clerkId = args.clerkId || identity.subject;
@@ -48,24 +48,24 @@ export const createOrUpdateUser = mutation({
       throw new Error("Missing required clerkId for user creation");
     }
 
-    console.log("Creating/updating user with data:", { 
-      clerkId, 
-      email, 
-      name, 
-      hasImage: !!imageUrl,
-      fromArgs: {
-        hasClerkId: !!args.clerkId,
-        hasEmail: !!args.email,
-        hasName: !!args.name,
-        hasImage: !!args.imageUrl
-      },
-      fromIdentity: {
-        hasClerkId: !!identity.subject,
-        hasEmail: !!identity.email,
-        hasName: !!identity.name,
-        hasImage: !!identity.pictureUrl
-      }
-    });
+    // console.log("Creating/updating user with data:", { 
+    //   clerkId, 
+    //   email, 
+    //   name, 
+    //   hasImage: !!imageUrl,
+    //   fromArgs: {
+    //     hasClerkId: !!args.clerkId,
+    //     hasEmail: !!args.email,
+    //     hasName: !!args.name,
+    //     hasImage: !!args.imageUrl
+    //   },
+    //   fromIdentity: {
+    //     hasClerkId: !!identity.subject,
+    //     hasEmail: !!identity.email,
+    //     hasName: !!identity.name,
+    //     hasImage: !!identity.pictureUrl
+    //   }
+    // });
 
     try {
       // Check if the user already exists
@@ -78,7 +78,7 @@ export const createOrUpdateUser = mutation({
         // User exists, update their information
         const userId = existingUser._id;
         
-        console.log(`Found existing user with ID ${userId}`);
+        // console.log(`Found existing user with ID ${userId}`);
         
         // Only update fields that need to be updated
         const updates: Partial<Doc<"users">> = {
@@ -104,16 +104,16 @@ export const createOrUpdateUser = mutation({
         
         // Only update if there are changes
         if (Object.keys(updates).length > 0) {
-          console.log(`Updating user ${userId} with fields:`, Object.keys(updates));
+          // console.log(`Updating user ${userId} with fields:`, Object.keys(updates));
           await ctx.db.patch(userId, updates);
         } else {
-          console.log(`No changes needed for user ${userId}`);
+          // console.log(`No changes needed for user ${userId}`);
         }
         
         return userId;
       } else {
         // Create a new user with default role of "user"
-        console.log("Creating new user with clerkId:", clerkId);
+        // console.log("Creating new user with clerkId:", clerkId);
         
         // Always include the timestamps from the server
         const userData = {
@@ -128,7 +128,7 @@ export const createOrUpdateUser = mutation({
         
         const userId = await ctx.db.insert("users", userData);
         
-        console.log(`Successfully created new user with ID ${userId}`);
+        // console.log(`Successfully created new user with ID ${userId}`);
         return userId;
       }
     } catch (error) {
@@ -305,7 +305,7 @@ export const migrateUserRoles = mutation({
       .unique();
     
     if (!currentUser) {
-      console.log(`User with clerkId ${clerkId} not found during role migration`);
+      // console.log(`User with clerkId ${clerkId} not found during role migration`);
       return 0;
     }
     
@@ -314,7 +314,7 @@ export const migrateUserRoles = mutation({
       await ctx.db.patch(currentUser._id, {
         role: "user", // Set default role
       });
-      console.log(`Updated user ${currentUser._id} with the default role of "user"`);
+      // console.log(`Updated user ${currentUser._id} with the default role of "user"`);
       return 1;
     }
     
@@ -392,13 +392,13 @@ export const getAll = query({
     
     // Only admins can list all users
     if (user?.role !== "admin") {
-      console.log("[getAll] Non-admin attempted to access all users:", userId);
+      // console.log("[getAll] Non-admin attempted to access all users:", userId);
       return [];
     }
     
     // For admins, return all users
     const users = await ctx.db.query("users").collect();
-    console.log(`[getAll] Admin ${userId} retrieved ${users.length} users`);
+    // console.log(`[getAll] Admin ${userId} retrieved ${users.length} users`);
     
     return users;
   },

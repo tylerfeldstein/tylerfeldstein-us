@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Check, ChevronRight, ArrowRight } from 'lucide-react';
+import { Check, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@clerk/nextjs';
@@ -64,7 +64,7 @@ const featureVariants = {
 };
 
 const PricingCard = ({
-  id,
+  // id,
   title,
   price,
   priceNote,
